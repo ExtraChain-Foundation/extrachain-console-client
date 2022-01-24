@@ -1,0 +1,11 @@
+#ifndef PRE_CONFIG_H
+#define PRE_CONFIG_H
+
+#define EXTRACHAIN_VERSION '"$$VERSION"'
+#define COMPILE_DATE '"$$COMPILE_DATE"'
+#define GIT_COMMIT '"$$GIT_COMMIT"'
+#define GIT_BRANCH '"$$GIT_BRANCH"'
+#define GIT_COMMIT_CORE '"$$GIT_COMMIT_CORE"'
+#define GIT_BRANCH_CORE '"$$GIT_BRANCH_CORE"'
+
+#endif // PRE_CONFIG_H
