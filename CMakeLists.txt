@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.21)
 
 file(STRINGS "../extrachain-core/extrachain_version" EXTRACHAIN_VERSION)
 project(extrachain-console LANGUAGES C CXX VERSION ${EXTRACHAIN_VERSION})
