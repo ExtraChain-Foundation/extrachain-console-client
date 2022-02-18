@@ -17,9 +17,9 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
 
     auto main = m_accountController->mainActor();
-    if (main->id() != m_accountController->getActorIndex()->firstId())
+    if (main.id() != m_accountController->getActorIndex()->firstId())
         return;
-    auto key = main->key();
+    auto &key = main.key();
 
     QByteArray actorIdEncrypted = key.encryptSelf(actorId.toLatin1());
     DBConnector db("notification");
@@ -51,9 +51,9 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "os       BLOB             NOT NULL);";
 
     auto main = m_accountController->mainActor();
-    if (main->id() != m_accountController->getActorIndex()->firstId())
+    if (main.id() != m_accountController->getActorIndex()->firstId())
         return;
-    auto key = main->key();
+    auto &key = main.key();
 
     QByteArray osActorId = actorId.toByteArray();
     std::string apk = m_accountController->getActorIndex()->getActor(actorId).key().publicKey();
@@ -95,8 +95,8 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         QString token = json["errorText"].toString();
         qDebug() << "[Push] Remove token" << token;
 
-        auto main = m_accountController->mainActor();
-        auto key = main->key();
+        auto &main = m_accountController->mainActor();
+        auto &key = main.key();
 
         DBConnector db("notification");
         db.deleteRow("Notification", { { "token", key.encryptSelf(token.toLatin1()).toStdString() } });
