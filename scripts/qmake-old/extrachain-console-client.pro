@@ -3,7 +3,7 @@ warning(Build with qmake is deprecated. It\'s recommended to use CMake)
 QT += core network
 QT -= gui
 
-TARGET = etalonium
+TARGET = extrachain-console
 CONFIG -= app_bundle
 CONFIG += c++2a console
 

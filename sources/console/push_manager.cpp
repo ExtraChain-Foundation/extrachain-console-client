@@ -17,11 +17,11 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
 
     auto main = m_accountController->mainActor();
-    if (main->id() != m_accountController->getActorIndex()->firstId())
+    if (main.id() != m_accountController->getActorIndex()->firstId())
         return;
-    auto key = main->key();
+    auto &key = main.key();
 
-    QByteArray actorIdEncrypted = key->encryptSelf(actorId.toLatin1());
+    QByteArray actorIdEncrypted = key.encryptSelf(actorId.toLatin1());
     DBConnector db("notification");
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
                                 : db.select("SELECT * FROM Notification WHERE actorId = ?;", "Notification",
@@ -33,8 +33,8 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     }
 
     for (auto &&el : res) {
-        QString token = key->decryptSelf(QByteArray::fromStdString(el["token"]));
-        QString os = key->decryptSelf(QByteArray::fromStdString(el["os"]));
+        QString token = key.decryptSelf(QByteArray::fromStdString(el["token"]));
+        QString os = key.decryptSelf(QByteArray::fromStdString(el["os"]));
 
         if (os == "ios" || os == "android") {
             qDebug() << "[Push] New notification:" << actorId << notification;
@@ -51,17 +51,17 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "os       BLOB             NOT NULL);";
 
     auto main = m_accountController->mainActor();
-    if (main->id() != m_accountController->getActorIndex()->firstId())
+    if (main.id() != m_accountController->getActorIndex()->firstId())
         return;
-    auto key = main->key();
+    auto &key = main.key();
 
     QByteArray osActorId = actorId.toByteArray();
-    std::string apk = m_accountController->getActorIndex()->getActor(actorId).key()->publicKey();
-    QByteArray osDecrypted = key->decrypt(os, apk);
-    QByteArray osToken = key->decrypt(token.toByteArray(), apk);
-    std::string osStr = key->encryptSelf(osDecrypted).toStdString();
-    std::string actorIdStr = key->encryptSelf(osActorId).toStdString();
-    std::string tokenStr = key->encryptSelf(osToken).toStdString();
+    std::string apk = m_accountController->getActorIndex()->getActor(actorId).key().publicKey();
+    QByteArray osDecrypted = key.decrypt(os, apk);
+    QByteArray osToken = key.decrypt(token.toByteArray(), apk);
+    std::string osStr = key.encryptSelf(osDecrypted).toStdString();
+    std::string actorIdStr = key.encryptSelf(osActorId).toStdString();
+    std::string tokenStr = key.encryptSelf(osToken).toStdString();
 
     if (osDecrypted != "ios" && osDecrypted != "android") {
         qDebug().noquote() << "[Push] Try save, but wrong os:" << osDecrypted;
@@ -95,11 +95,11 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         QString token = json["errorText"].toString();
         qDebug() << "[Push] Remove token" << token;
 
-        auto main = m_accountController->mainActor();
-        auto key = main->key();
+        auto &main = m_accountController->mainActor();
+        auto &key = main.key();
 
         DBConnector db("notification");
-        db.deleteRow("Notification", { { "token", key->encryptSelf(token.toLatin1()).toStdString() } });
+        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toLatin1()).toStdString() } });
     } else {
         qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
         // TODO: repeat request, ConnectionError

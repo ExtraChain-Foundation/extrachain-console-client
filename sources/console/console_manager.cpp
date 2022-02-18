@@ -102,7 +102,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "sendtx") {
         qDebug() << "sendtx";
-        auto mainActorId = accController->mainActor()->id();
+        auto mainActorId = accController->mainActor().id();
         ActorId firstId = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");

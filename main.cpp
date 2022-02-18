@@ -28,17 +28,18 @@ int main(int argc, char* argv[]) {
     qDebug() << "[Rust]" << EXTRACHAIN_RUST_VERSION << "|" << number_42();
 #endif
 
-    app.setApplicationName("Etalonium");
+    app.setApplicationName("ExtraChain Console Client");
     app.setOrganizationName("ExtraChain Foundation");
-    app.setOrganizationDomain("https://etalonium.io/");
+    app.setOrganizationDomain("https://extrachain.io/");
     app.setApplicationVersion(EXTRACHAIN_VERSION);
 
     registerMetaTypes();
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
-        "Etalonium is decentralized online platform in the world of fashion, that provides tools for open "
-        "and reliable interaction between the insiders of the fashion industry in a new, innovative way.");
+        "ExtraChain (ExC) is a lightweight blockchain infrastructure and decentralized storage ExDFS "
+        "allowing creation of high-load dApps (decentralized applications) for both portable, non-portable "
+        "and IoT devices.");
     parser.addHelpOption();
     parser.addVersionOption();
 
@@ -73,18 +74,16 @@ int main(int argc, char* argv[]) {
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
 #endif
-    LogsManager::etHandler();
 
     qInfo() << " ┌───────────────────────────────────────────┐";
-    qInfo().nospace() << " │           Etalonium " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
-                      << "           │";
+    qInfo().nospace() << " │            ExtraChain " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
+                      << "         │";
     if (LogsManager::debugLogs)
-        qInfo() << " │  Console:" << GIT_COMMIT << "| ExtraChain:" << GIT_COMMIT_CORE << "  │";
-    // qInfo() << "|                Build" << Network::build << "                |";
+        qInfo() << " │     Console:" << GIT_COMMIT << "| Core:" << GIT_COMMIT_CORE << "     │";
     qInfo() << " └───────────────────────────────────────────┘";
-    qInfo().noquote().nospace() << "[Build Info] Compiler: " << Utils::detectCompiler() << ", Qt "
-                                << QT_VERSION_STR << ", ExtraChain " << EXTRACHAIN_VERSION << ", SQLite "
-                                << DBConnector::sqlite_version() << ", Sodium "
+    LogsManager::etHandler();
+    qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
+                                << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
                                 << SecretKey::sodium_version().c_str() << ", Boost " << Utils::boostVersion()
                                 << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
