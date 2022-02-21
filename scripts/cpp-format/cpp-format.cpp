@@ -33,7 +33,7 @@ int searchFromCurrentPath() {
     qInfo() << "Can't find path from args";
     auto dir = QDir::current();
 
-    if (!dir.path().contains("/etalonium-console/")) {
+    if (!dir.path().contains("/extrachain-console-client/")) {
         return -1;
     }
 

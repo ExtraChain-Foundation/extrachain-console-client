@@ -201,7 +201,7 @@ void ConsoleManager::commandReceiver(QString command) {
         // generate as wallets for now
         for (long long i = 0; i != count; ++i) {
             auto hash = node->privateProfile()->hash();
-            auto actor = accController->createActor(ActorType::Wallet, hash);
+            auto actor = accController->createActor(ActorType::User, hash);
             emit node->savePrivateProfile(hash, actor.id());
         }
         qInfo() << "----------------------------------------------------------------";
