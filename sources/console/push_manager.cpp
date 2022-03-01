@@ -2,22 +2,18 @@
 
 #include "datastorage/index/actorindex.h"
 
-PushManager::PushManager(QObject *parent)
+PushManager::PushManager(ExtraChainNode *node, QObject *parent)
     : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &PushManager::responseResolver);
-}
-
-void PushManager::setAccController(AccountController *accountController) {
-    m_accountController = accountController;
 }
 
 void PushManager::pushNotification(QString actorId, Notification notification) {
     if (!QFile::exists("notification"))
         return;
 
-    auto main = m_accountController->mainActor();
-    if (main.id() != m_accountController->getActorIndex()->firstId())
+    auto main = node->accountController()->mainActor();
+    if (main.id() != node->actorIndex()->firstId())
         return;
     auto &key = main.key();
 
@@ -50,13 +46,13 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "actorId  BLOB             NOT NULL, "
         "os       BLOB             NOT NULL);";
 
-    auto main = m_accountController->mainActor();
-    if (main.id() != m_accountController->getActorIndex()->firstId())
+    auto main = node->accountController()->mainActor();
+    if (main.id() != node->actorIndex()->firstId())
         return;
     auto &key = main.key();
 
     QByteArray osActorId = actorId.toByteArray();
-    std::string apk = m_accountController->getActorIndex()->getActor(actorId).key().publicKey();
+    std::string apk = node->actorIndex()->getActor(actorId).key().publicKey();
     QByteArray osDecrypted = key.decrypt(os, apk);
     QByteArray osToken = key.decrypt(token.toByteArray(), apk);
     std::string osStr = key.encryptSelf(osDecrypted).toStdString();
@@ -95,7 +91,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         QString token = json["errorText"].toString();
         qDebug() << "[Push] Remove token" << token;
 
-        auto &main = m_accountController->mainActor();
+        auto &main = node->accountController()->mainActor();
         auto &key = main.key();
 
         DBConnector db("notification");
@@ -205,12 +201,11 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     if (userId.isEmpty())
         return message;
 
-    auto actorIndex = m_accountController->getActorIndex();
     //    if (actorIndex == nullptr || !actorIndex)
     //    {
     //        qFatal("[Push] No actor index access");
     //    }
-    QByteArrayList profile = actorIndex->getProfile(userId);
+    QByteArrayList profile = node->actorIndex()->getProfile(userId);
     if (profile.isEmpty())
         return message;
     else {

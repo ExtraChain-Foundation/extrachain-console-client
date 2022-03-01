@@ -23,7 +23,7 @@ ConsoleManager::ConsoleManager(QObject *parent)
     , notifierInput(stdin, QIODevice::ReadOnly)
 #endif
 {
-    m_pushManager = new PushManager(this);
+    m_pushManager = new PushManager(node.get());
 }
 
 ConsoleManager::~ConsoleManager() {
@@ -122,12 +122,12 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command == "cn count" || command == "connections count") {
-        qInfo() << "Connections:" << node->networkManager()->connections().length();
+        qInfo() << "Connections:" << node->network()->connections().length();
         qInfo() << "DFS Connections:" << node->dfs()->networkManager()->connections().length();
     }
 
     if (command == "cn list" || command == "connections list") {
-        auto &connections = node->networkManager()->connections();
+        auto &connections = node->network()->connections();
         auto &dfsConnections = node->dfs()->networkManager()->connections();
         auto print = [](auto el) {
             qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
@@ -178,7 +178,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (Utils::isValidIp(ip) && (protocol == "tcp" || protocol == "ws")) {
             auto networkProtocol = protocol == "tcp" ? Network::Protocol::Tcp : Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
-            node.get()->networkManager()->connectToNode(ip, networkProtocol);
+            node.get()->network()->connectToNode(ip, networkProtocol);
             emit node.get()->dfs()->connectToNode(ip, networkProtocol);
         } else {
             qInfo() << "Invalid connect input";
@@ -223,9 +223,8 @@ PushManager *ConsoleManager::pushManager() const {
 void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &value) {
     node = value;
     accController = node->accountController();
-    networkManager = node->networkManager();
+    networkManager = node->network();
 
-    m_pushManager->setAccController(accController);
     auto dfs = node->dfs();
     auto resolver = node->resolveManager();
     connect(node.get(), &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
