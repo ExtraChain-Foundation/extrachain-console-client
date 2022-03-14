@@ -111,7 +111,7 @@ void ConsoleManager::commandReceiver(QString command) {
             QByteArray toAmount = sendtx[2].toUtf8();
             qDebug() << "sendtx" << toId << toAmount;
 
-            ActorId receiver(toId);
+            ActorId receiver(toId.toStdString());
             BigNumber amount = Transaction::visibleToAmount(toAmount);
 
             if (mainActorId != firstId)
