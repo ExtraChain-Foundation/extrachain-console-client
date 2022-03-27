@@ -17,7 +17,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
     auto &key = main.key();
 
-    QByteArray actorIdEncrypted = key.encryptSelf(actorId.toLatin1());
+    QByteArray actorIdEncrypted = QByteArray::fromStdString(key.encryptSelf(actorId.toStdString()));
     DBConnector db("notification");
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
                                 : db.select("SELECT * FROM Notification WHERE actorId = ?;", "Notification",
@@ -29,8 +29,8 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     }
 
     for (auto &&el : res) {
-        QString token = key.decryptSelf(QByteArray::fromStdString(el["token"]));
-        QString os = key.decryptSelf(QByteArray::fromStdString(el["os"]));
+        QString token = QString::fromStdString(key.decryptSelf(el["token"]));
+        QString os = QString::fromStdString(key.decryptSelf(el["os"]));
 
         if (os == "ios" || os == "android") {
             qDebug() << "[Push] New notification:" << actorId << notification;
@@ -51,25 +51,23 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         return;
     auto &key = main.key();
 
-    QByteArray osActorId = actorId.toByteArray();
+    const std::string &osActorId = actorId.toStdString();
     std::string apk = node->actorIndex()->getActor(actorId).key().publicKey();
-    QByteArray osDecrypted = key.decrypt(os, apk);
-    QByteArray osToken = key.decrypt(token.toByteArray(), apk);
-    std::string osStr = key.encryptSelf(osDecrypted).toStdString();
-    std::string actorIdStr = key.encryptSelf(osActorId).toStdString();
-    std::string tokenStr = key.encryptSelf(osToken).toStdString();
+    std::string osDecrypted = key.decrypt(os.toStdString(), apk);
+    std::string osToken = key.decrypt(token.toStdString(), apk);
 
     if (osDecrypted != "ios" && osDecrypted != "android") {
-        qDebug().noquote() << "[Push] Try save, but wrong os:" << osDecrypted;
+        qDebug().noquote() << "[Push] Try save, but wrong os:" << QByteArray::fromStdString(osDecrypted);
         return;
     }
 
     DBConnector db("notification");
     db.createTable(notificationTableCreation);
-    db.deleteRow("Notification", { { "token", tokenStr } });
-    db.insert("Notification", { { "actorId", actorIdStr }, { "token", tokenStr }, { "os", osStr } });
+    db.deleteRow("Notification", { { "token", osToken } });
+    db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
 
-    qDebug() << "[Push] Saved" << osDecrypted << osActorId << osToken;
+    qDebug() << "[Push] Saved" << QByteArray::fromStdString(osDecrypted)
+             << QByteArray::fromStdString(osActorId) << QByteArray::fromStdString(osToken);
 }
 
 void PushManager::responseResolver(QNetworkReply *reply) {
@@ -95,7 +93,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         auto &key = main.key();
 
         DBConnector db("notification");
-        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toLatin1()).toStdString() } });
+        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toStdString()) } });
     } else {
         qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
         // TODO: repeat request, ConnectionError
