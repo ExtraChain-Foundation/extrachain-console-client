@@ -123,12 +123,11 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command == "cn count" || command == "connections count") {
         qInfo() << "Connections:" << node->network()->connections().length();
-        qInfo() << "DFS Connections:" << node->dfs()->networkManager()->connections().length();
     }
 
     if (command == "cn list" || command == "connections list") {
         auto &connections = node->network()->connections();
-        auto &dfsConnections = node->dfs()->networkManager()->connections();
+        // auto &dfsConnections = node->dfs()->networkManager()->connections();
         auto print = [](auto el) {
             qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
                               << el->protocolString() << el->identifier();
@@ -138,11 +137,7 @@ void ConsoleManager::commandReceiver(QString command) {
             qInfo() << "Connections:";
             std::for_each(connections.begin(), connections.end(), print);
         }
-        if (dfsConnections.length() > 0) {
-            qInfo() << "DFS Connections:";
-            std::for_each(dfsConnections.begin(), dfsConnections.end(), print);
-        }
-        if (connections.length() == 0 && dfsConnections.length() == 0)
+        if (connections.length() == 0)
             qInfo() << "No connections";
         qInfo() << "-----------";
     }
@@ -179,7 +174,6 @@ void ConsoleManager::commandReceiver(QString command) {
             auto networkProtocol = protocol == "tcp" ? Network::Protocol::Tcp : Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
             node.get()->network()->connectToNode(ip, networkProtocol);
-            emit node.get()->dfs()->connectToNode(ip, networkProtocol);
         } else {
             qInfo() << "Invalid connect input";
         }
@@ -228,8 +222,8 @@ void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &va
     auto dfs = node->dfs();
     auto resolver = node->resolveManager();
     connect(node.get(), &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
-    connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
-    connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
+    // connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
+    // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
     connect(resolver, &ResolveManager::saveNotificationToken, this, &ConsoleManager::saveNotificationToken);
 
     connect(node->privateProfile(), &PrivateProfile::loginError, [](int error) {
