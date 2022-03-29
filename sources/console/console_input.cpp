@@ -9,7 +9,9 @@ ConsoleInput::ConsoleInput(QObject *parent)
 }
 
 ConsoleInput::~ConsoleInput() {
-    delete notifierInput;
+    if (notifierInput != nullptr) {
+        delete notifierInput;
+    }
 }
 
 void ConsoleInput::process() {
