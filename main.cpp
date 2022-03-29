@@ -9,8 +9,6 @@
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
-//#include "dfs/packages/headers/dfs_universal.h"
-#include "dfs/packages/headers/dfs_request.h"
 //#include "network/packages/service/downloaddfsrequest.h"
 #include "enc/enc_tools.h"
 #include "metatypes.h"

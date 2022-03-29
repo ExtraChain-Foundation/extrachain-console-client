@@ -1,13 +1,14 @@
 #include "console/console_manager.h"
+
+#include <QProcess>
+#include <QTextStream>
+
+#include "datastorage/index/actorindex.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
 #include "profile/private_profile.h"
-#include "resolve/resolve_manager.h"
-
-#include <QProcess>
-#include <QTextStream>
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -170,8 +171,8 @@ void ConsoleManager::commandReceiver(QString command) {
             ip = Utils::findLocalIp().ip().toString();
         QString protocol = list[1];
 
-        if (Utils::isValidIp(ip) && (protocol == "tcp" || protocol == "ws")) {
-            auto networkProtocol = protocol == "tcp" ? Network::Protocol::Tcp : Network::Protocol::WebSocket;
+        if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
+            auto networkProtocol = Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
             node.get()->network()->connectToNode(ip, networkProtocol);
         } else {
@@ -220,11 +221,11 @@ void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &va
     networkManager = node->network();
 
     auto dfs = node->dfs();
-    auto resolver = node->resolveManager();
     connect(node.get(), &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
     // connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
     // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
-    connect(resolver, &ResolveManager::saveNotificationToken, this, &ConsoleManager::saveNotificationToken);
+    // connect(resolver, &ResolveManager::saveNotificationToken, this,
+    // &ConsoleManager::saveNotificationToken);
 
     connect(node->privateProfile(), &PrivateProfile::loginError, [](int error) {
         switch (error) {

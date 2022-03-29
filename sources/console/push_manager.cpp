@@ -101,40 +101,40 @@ void PushManager::responseResolver(QNetworkReply *reply) {
 }
 
 void PushManager::chatMessage(QString sender, QString msgPath) {
-    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
-    QString chatId = msgPath.mid(32, 64);
+    //    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
+    //    QString chatId = msgPath.mid(32, 64);
 
-    std::string usersPath = CardManager::buildPathForFile(
-        userId.toStdString(), chatId.toStdString() + "/users", DfsStruct::Type(104));
-    DBConnector db(usersPath);
-    auto res = db.select("SELECT * FROM Users");
+    //    std::string usersPath = CardManager::buildPathForFile(
+    //        userId.toStdString(), chatId.toStdString() + "/users", DfsStruct::Type(104));
+    //    DBConnector db(usersPath);
+    //    auto res = db.select("SELECT * FROM Users");
 
-    if (res.size() == 2) {
-        QString users[2] = { QString::fromStdString(res[0]["userId"]),
-                             QString::fromStdString(res[1]["userId"]) };
+    //    if (res.size() == 2) {
+    //        QString users[2] = { QString::fromStdString(res[0]["userId"]),
+    //                             QString::fromStdString(res[1]["userId"]) };
 
-        pushNotification(
-            users[0] == sender ? users[1] : users[0],
-            Notification { .time = 100,
-                           .type = Notification::NotifyType::ChatMsg,
-                           .data = (users[0] == sender ? users[0] : users[1]).toLatin1() + " " });
-    };
+    //        pushNotification(
+    //            users[0] == sender ? users[1] : users[0],
+    //            Notification { .time = 100,
+    //                           .type = Notification::NotifyType::ChatMsg,
+    //                           .data = (users[0] == sender ? users[0] : users[1]).toLatin1() + " " });
+    //    };
 }
 
-void PushManager::fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId) {
-    Q_UNUSED(original)
+// void PushManager::fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId) {
+//     Q_UNUSED(original)
 
-    if (type == DfsStruct::Type::Post || type == DfsStruct::Type::Event) {
-        if (path.contains("."))
-            return;
+//    if (type == DfsStruct::Type::Post || type == DfsStruct::Type::Event) {
+//        if (path.contains("."))
+//            return;
 
-        Notification notify { .time = 100,
-                              .type = type == DfsStruct::Type::Post ? Notification::NewPost
-                                                                    : Notification::NewEvent,
-                              .data = actorId.toLatin1() + " " };
-        pushNotification("all", notify);
-    }
-}
+//        Notification notify { .time = 100,
+//                              .type = type == DfsStruct::Type::Post ? Notification::NewPost
+//                                                                    : Notification::NewEvent,
+//                              .data = actorId.toLatin1() + " " };
+//        pushNotification("all", notify);
+//    }
+//}
 
 void PushManager::sendNotification(const QString &token, const QString &os,
                                    const Notification &notification) {
