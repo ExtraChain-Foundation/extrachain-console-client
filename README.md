@@ -23,7 +23,7 @@ Clone:
 
 For Ubuntu:
 
-    sudo apt install autoconf curl zip unzip tar libgmp-dev clang
+    sudo apt install autoconf curl zip unzip tar libgmp-dev ninja-build clang
 
 3. And install vcpkg:
 
@@ -41,7 +41,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium:x64-windows sqlite3:x64-windows mpir:x64-windows
+    .\vcpkg install libsodium:x64-windows sqlite3:x64-windows mpir:x64-windows boost:x64-windows
 
 and install integrate:
 
@@ -49,7 +49,11 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3
+    ./vcpkg install libsodium sqlite3 boost
+
+If arm, before:
+
+	export VCPKG_FORCE_SYSTEM_BINARIES=arm
 
 6. Build project.
 
