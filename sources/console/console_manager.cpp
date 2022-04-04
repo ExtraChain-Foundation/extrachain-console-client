@@ -3,6 +3,7 @@
 #include <QProcess>
 #include <QTextStream>
 
+#include "datastorage/dfs/dfs_controller.h"
 #include "datastorage/index/actorindex.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
@@ -208,6 +209,14 @@ void ConsoleManager::commandReceiver(QString command) {
         QString actorId = command.mid(5, 20);
         Notification notify { .time = 100, .type = Notification::NewPost, .data = actorId.toLatin1() + " " };
         m_pushManager->pushNotification(actorId, notify);
+    }
+
+    if (command.left(8) == "dfs add ") {
+        auto file = command.mid(8).toStdWString();
+        qInfo() << "Adding file to DFS:" << command.mid(8).data();
+
+        node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
+                                  DFS::Encryption::Public);
     }
 }
 
