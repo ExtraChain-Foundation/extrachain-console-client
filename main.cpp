@@ -7,10 +7,9 @@
 #include <QStandardPaths>
 
 #include "console/console_manager.h"
+#include "datastorage/dfs/dfs_controller.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
-//#include "network/packages/service/downloaddfsrequest.h"
-#include "enc/enc_tools.h"
 #include "metatypes.h"
 
 #include "rextrachain/rextrachain.h"
@@ -82,7 +81,7 @@ int main(int argc, char* argv[]) {
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
-                                << SecretKey::sodium_version().c_str() << ", Boost " << Utils::boostVersion()
+                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion()
                                 << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
@@ -110,6 +109,27 @@ int main(int argc, char* argv[]) {
 
     auto node = std::make_shared<ExtraChainNode>();
     console.setExtraChainNode(node);
+
+    // dfs temp
+    QObject::connect(node->dfs(), &DfsController::added, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Downloaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloadProgress,
+                     [](ActorId actorId, std::string hash, int progress) {
+                         qInfo() << "[Console/DFS] Download progress:" << actorId
+                                 << QString::fromStdString(hash) << progress;
+                     });
+    QObject::connect(node->dfs(), &DfsController::uploadProgress,
+                     [](ActorId actorId, std::string fileHash, int progress) {
+                         qInfo() << "[Console/DFS] Upload progress:" << actorId
+                                 << QString::fromStdString(fileHash) << " " << progress;
+                     });
 
     if (isNewNetwork)
         node->createNewNetwork(email, password, "Etalonium Coin", "1111", "#fa4868");
