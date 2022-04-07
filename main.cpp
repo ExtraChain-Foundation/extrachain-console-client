@@ -63,6 +63,10 @@ int main(int argc, char* argv[]) {
 
     QLockFile lockFile(".console.lock");
     if (!lockFile.tryLock(100)) {
+        if (!QFile::exists(".console.lock")) {
+            qDebug() << "[Console] Unable to write files. Check folder permissions";
+            return -1;
+        }
         qDebug() << "[Console] Already running in directory" << QDir::currentPath();
         return -1;
     }
@@ -111,9 +115,11 @@ int main(int argc, char* argv[]) {
     console.setExtraChainNode(node);
 
     // dfs temp
-    QObject::connect(node->dfs(), &DfsController::added, [](ActorId actorId, std::string fileHash) {
-        qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash);
-    });
+    QObject::connect(node->dfs(), &DfsController::added,
+                     [](ActorId actorId, std::string fileHash, std::string visual, int64_t size) {
+                         qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
+                                 << QString::fromStdString(visual) << size;
+                     });
     QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
         qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
     });
