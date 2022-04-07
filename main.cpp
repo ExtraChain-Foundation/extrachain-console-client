@@ -12,18 +12,12 @@
 #include "managers/logs_manager.h"
 #include "metatypes.h"
 
-#include "rextrachain/rextrachain.h"
-
 #ifndef EXTRACHAIN_CMAKE
     #include "preconfig.h"
 #endif
 
 int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
-
-#ifdef EXTRACHAIN_ENABLE_RUST
-    qDebug() << "[Rust]" << EXTRACHAIN_RUST_VERSION << "|" << number_42();
-#endif
 
     app.setApplicationName("ExtraChain Console Client");
     app.setOrganizationName("ExtraChain Foundation");

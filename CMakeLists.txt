@@ -35,10 +35,6 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
 
 target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain)
 
-if (EXTRACHAIN_ENABLE_RUST)
-    target_link_libraries(extrachain-console PRIVATE rextrachain)
-endif (EXTRACHAIN_ENABLE_RUST)
-
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
