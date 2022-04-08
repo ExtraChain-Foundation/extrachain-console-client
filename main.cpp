@@ -79,8 +79,8 @@ int main(int argc, char* argv[]) {
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
-                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion()
-                                << ", Boost Asio " << Utils::boostAsioVersion();
+                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
+    // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
     qInfo() << "";
