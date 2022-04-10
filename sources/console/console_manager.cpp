@@ -129,37 +129,18 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command == "cn list" || command == "connections list") {
         auto &connections = node->network()->connections();
-        // auto &dfsConnections = node->dfs()->networkManager()->connections();
-        auto print = [](auto el) {
-            qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
-                              << el->protocolString() << el->identifier();
-        };
 
         if (connections.length() > 0) {
             qInfo() << "Connections:";
-            std::for_each(connections.begin(), connections.end(), print);
+            std::for_each(connections.begin(), connections.end(), [](auto &el) {
+                qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
+                                  << el->protocolString() << el->identifier();
+            });
         }
-        if (connections.length() == 0)
+        else {
             qInfo() << "No connections";
-        qInfo() << "-----------";
-    }
-
-    // TODO: actor create LOGIN PASSWORD
-
-    if (command.left(14) == "network create") {
-        // TODO
-        return;
-        QString loginPassword = command.mid(15);
-
-        auto list = loginPassword.indexOf(" ") != -1 ? loginPassword.split(" ") : QStringList {};
-
-        if (loginPassword.isEmpty() || list.length() != 2) {
-            qInfo() << "Incorrect login or password.";
-            qInfo() << "Command usage: network create LOGIN PASSWORD";
-            return;
         }
-
-        // node->createNewNetwork(list[0], list[1]);
+        qInfo() << "-----------";
     }
 
     if (command.left(7) == "connect") {
@@ -181,27 +162,24 @@ void ConsoleManager::commandReceiver(QString command) {
         }
     }
 
-    if (command.left(10) == "disconnect") {
-        // qInfo().noquote() << "Disconnect";
-        // emit node.get()->removeConnection("");
-    }
-
-    if (command.left(4) == "gena") {
+    if (command.left(7) == "wallet ") {
         auto list = command.split(" ");
+        if (list.length() > 1) {
+            if (list[1] == "new") {
+                auto actor = node->accountController()->createWallet();
+                qInfo() << "Wallet created:" << actor.id();
+            }
 
-        if (list.length() != 2)
-            return;
-
-        long long count = list[1].toLongLong();
-
-        // generate as wallets for now
-        for (long long i = 0; i != count; ++i) {
-            auto hash = node->privateProfile()->hash();
-            auto actor = accController->createActor(ActorType::User, hash);
-            emit node->savePrivateProfile(hash, actor.id());
+            if (list[1] == "list") {
+                qInfo() << "Wallets:";
+                auto actors = node->accountController()->accounts();
+                for (const auto &actor : actors) {
+                    if (actor.id() != node->accountController()->mainActor().id()) {
+                        qInfo() << "Wallet" << actor.id();
+                    }
+                }
+            }
         }
-        qInfo() << "----------------------------------------------------------------";
-        qInfo() << "Actors generation complete, count:" << count;
     }
 
     if (command.left(4) == "push") {
@@ -221,11 +199,12 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "export") {
         auto data = QString::fromStdString(node->exportUser());
-        qDebug().noquote() << data;
-
-        QFile file("export.extrachain");
+        QString fileName =
+            QString("%1.extrachain").arg(node->accountController()->mainActor().id().toString());
+        QFile file(fileName);
         file.open(QFile::WriteOnly);
-        file.write(data.toUtf8());
+        if (file.write(data.toUtf8()) > 1)
+            qInfo() << "Exported to" << fileName;
         file.close();
     }
 }
