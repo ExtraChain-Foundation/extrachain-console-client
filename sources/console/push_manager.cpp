@@ -1,5 +1,7 @@
 #include "console/push_manager.h"
 
+#include <QJsonObject>
+
 #include "datastorage/index/actorindex.h"
 
 PushManager::PushManager(ExtraChainNode *node, QObject *parent)
