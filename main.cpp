@@ -37,12 +37,13 @@ int main(int argc, char* argv[]) {
     QCommandLineOption debugOption("debug", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
-    QCommandLineOption emailOption({ "e", "email" }, "Set email.", "email");
-    QCommandLineOption passOption({ "s", "password" }, "Set password.", "password");
+    QCommandLineOption emailOption({ "e", "email" }, "Set email", "email");
+    QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption createNetworkOption("create-network", "First network creation");
+    QCommandLineOption importOption("import", "Import from file", "import");
     parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, createNetworkOption,
-                        clearDataOption });
+                        clearDataOption, importOption });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -133,6 +134,14 @@ int main(int argc, char* argv[]) {
 
     if (isNewNetwork)
         node->createNewNetwork(email, password, "Etalonium Coin", "1111", "#fa4868");
+
+    QString importFile = parser.value(importOption);
+    if (!importFile.isEmpty()) {
+        QFile file(importFile);
+        file.open(QFile::ReadOnly);
+        node->importUser(file.readAll().toStdString(), email.toStdString(), password.toStdString());
+        file.close();
+    }
 
     if (node->accountController()->getAccountCount() == 0)
         emit node->login(email.toUtf8(), password.toUtf8());

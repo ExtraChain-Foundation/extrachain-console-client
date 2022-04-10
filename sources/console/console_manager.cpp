@@ -218,6 +218,16 @@ void ConsoleManager::commandReceiver(QString command) {
         node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
                                   DFS::Encryption::Public);
     }
+
+    if (command.left(6) == "export") {
+        auto data = QString::fromStdString(node->exportUser());
+        qDebug().noquote() << data;
+
+        QFile file("export.extrachain");
+        file.open(QFile::WriteOnly);
+        file.write(data.toUtf8());
+        file.close();
+    }
 }
 
 PushManager *ConsoleManager::pushManager() const {
