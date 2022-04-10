@@ -136,8 +136,7 @@ void ConsoleManager::commandReceiver(QString command) {
                 qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
                                   << el->protocolString() << el->identifier();
             });
-        }
-        else {
+        } else {
             qInfo() << "No connections";
         }
         qInfo() << "-----------";
@@ -173,6 +172,8 @@ void ConsoleManager::commandReceiver(QString command) {
             if (list[1] == "list") {
                 qInfo() << "Wallets:";
                 auto actors = node->accountController()->accounts();
+                auto mainId = node->accountController()->mainActor().id();
+                qInfo() << "User" << mainId;
                 for (const auto &actor : actors) {
                     if (actor.id() != node->accountController()->mainActor().id()) {
                         qInfo() << "Wallet" << actor.id();

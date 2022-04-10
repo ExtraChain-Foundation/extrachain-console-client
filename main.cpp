@@ -139,11 +139,16 @@ int main(int argc, char* argv[]) {
     if (!importFile.isEmpty()) {
         QFile file(importFile);
         file.open(QFile::ReadOnly);
-        node->importUser(file.readAll().toStdString(), email.toStdString(), password.toStdString());
+        auto data = file.readAll().toStdString();
+        if (data.empty()) {
+            qInfo() << "Incorrect import";
+            std::exit(0);
+        }
+        node->importUser(data, email.toStdString(), password.toStdString());
         file.close();
     }
 
-    if (node->accountController()->getAccountCount() == 0)
+    if (node->accountController()->count() == 0)
         emit node->login(email.toUtf8(), password.toUtf8());
 
     password.clear();
