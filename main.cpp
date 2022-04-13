@@ -42,8 +42,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption createNetworkOption("create-network", "First network creation");
     QCommandLineOption importOption("import", "Import from file", "import");
+    QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, createNetworkOption,
-                        clearDataOption, importOption });
+                        clearDataOption, importOption, netdebOption });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -69,6 +70,7 @@ int main(int argc, char* argv[]) {
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
+    Network::networkDebug = parser.isSet(netdebOption);
 #endif
 
     qInfo() << " ┌───────────────────────────────────────────┐";
