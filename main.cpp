@@ -12,7 +12,9 @@
 #include "managers/logs_manager.h"
 #include "metatypes.h"
 
-#include "rextrachain/rextrachain.h"
+//#include "rextrachain/rextrachain.h"
+
+#include "datastorage/dfs/permission_manager.h"
 
 #ifndef EXTRACHAIN_CMAKE
     #include "preconfig.h"
@@ -134,10 +136,229 @@ int main(int argc, char* argv[]) {
     if (isNewNetwork)
         node->createNewNetwork(email, password, "Etalonium Coin", "1111", "#fa4868");
 
-    if (node->accountController()->getAccountCount() == 0)
+    if (node->accountController()->count() == 0)
         emit node->login(email.toUtf8(), password.toUtf8());
 
     password.clear();
+
+    QObject::connect(node.get(), &ExtraChainNode::ready, [&]() {
+        qInfo() << "ready to test permission manager";
+
+        PermissionManager pm(node.get());
+        qInfo() << "count accounts: "<< node->accountController()->count();
+        qInfo() << "Start permission manager test:";
+        const std::string pathToAddFile = "/Users/andreea/Downloads/Ids.pdf";
+        const auto actor = node->accountController()->mainActor();
+        std::string localFile = node->dfs()->addLocalFile(actor, pathToAddFile, "console",
+                                                          DFS::Encryption::Public);
+
+        const auto path = node->dfs()->getFileFromStorage(node->accountController()->mainActor().id(), localFile);
+        std::filesystem::path fpath = DFS::Path::convertPathToPlatform(pathToAddFile);
+        std::filesystem::path newFilePath = fpath;
+        std::string fileHash = Utils::calcKeccakForFile(newFilePath);
+
+        qInfo() << "[Path]: " << QString::fromStdString(path);
+        qInfo() << "File hash: " << QString::fromStdString(fileHash);
+
+        DFS::Permission::PermissionMode mode;
+        DFS::Permission::AddPermission addPermission;
+        addPermission.actor = actor.id().toStdString();
+        addPermission.permissionValue = mode.toInt();
+        addPermission.path = path;
+        addPermission.userId = actor.id().toStdString();
+        addPermission.fileHash = fileHash;
+        pm.sign(actor, addPermission);
+
+        qInfo() << "sign by signature: " << QString::fromStdString(addPermission.signature) << QString::fromStdString(addPermission.path);
+        pm.savePermission(addPermission);
+
+        const auto publicActor = node->actorIndex()->getActor(actor.id());
+        qInfo() << "public actor key: "<< publicActor.key();
+
+        qInfo() << "verify: " << pm.verify(publicActor, addPermission);
+        Q_ASSERT(pm.verify(publicActor, addPermission) == true);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - false";;
+            Q_ASSERT(pm.isReadable(mode) == false);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - false";
+            Q_ASSERT(pm.isWritable(mode) == false);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - false";
+            Q_ASSERT(pm.isCustomizable(mode) == false);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - false";
+            Q_ASSERT(pm.isEditable(mode) == false);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - false";
+            Q_ASSERT(pm.hasPermission(mode) == false);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - true";
+            Q_ASSERT(pm.noPermission(mode) == true);
+        }
+
+        pm.addPermission(mode, DFS::Permission::Read);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - false";
+            Q_ASSERT(pm.isWritable(mode) == false);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - false";
+            Q_ASSERT(pm.isCustomizable(mode) == false);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - false";
+            Q_ASSERT(pm.isEditable(mode) == false);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            Q_ASSERT(pm.hasPermission(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+            Q_ASSERT(pm.noPermission(mode) == false);
+        }
+
+        pm.addPermission(mode, DFS::Permission::Write);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - true";
+            Q_ASSERT(pm.isWritable(mode) == true);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - false";
+            Q_ASSERT(pm.isCustomizable(mode) == false);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - false";
+            Q_ASSERT(pm.isEditable(mode) == false);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            Q_ASSERT(pm.hasPermission(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+            Q_ASSERT(pm.noPermission(mode) == false);
+        }
+
+        pm.addPermission(mode, DFS::Permission::Edit);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - true";
+            Q_ASSERT(pm.isWritable(mode) == true);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - false";
+            Q_ASSERT(pm.isCustomizable(mode) == false);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - true";
+            Q_ASSERT(pm.isEditable(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            Q_ASSERT(pm.hasPermission(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+            Q_ASSERT(pm.noPermission(mode) == false);
+        }
+
+        pm.addPermission(mode, DFS::Permission::Custom);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - true";
+            Q_ASSERT(pm.isWritable(mode) == true);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - true";
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - true";
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+
+            pm.addPermission(mode, DFS::Permission::Remove);
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - true";
+            Q_ASSERT(pm.isWritable(mode) == true);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - true";
+            Q_ASSERT(pm.isCustomizable(mode) == true);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - true";
+            Q_ASSERT(pm.isEditable(mode) == true);
+
+            qInfo() << "mode is removable: " << pm.isRemovable(mode) << " must be - true";
+            Q_ASSERT(pm.isRemovable(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            Q_ASSERT(pm.hasPermission(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+            Q_ASSERT(pm.noPermission(mode) == false);
+        }
+
+        pm.addPermission(mode, DFS::Permission::Service);
+        {
+            qInfo() << "mode is readable: " << pm.isReadable(mode) << " must be - true";
+            Q_ASSERT(pm.isReadable(mode) == true);
+
+            qInfo() << "mode is writable: " << pm.isWritable(mode) << " must be - true";
+            Q_ASSERT(pm.isWritable(mode) == true);
+
+            qInfo() << "mode is customizable: " << pm.isCustomizable(mode) << " must be - true";
+            Q_ASSERT(pm.isCustomizable(mode) == true);
+
+            qInfo() << "mode is editable: " << pm.isEditable(mode) << " must be - true";
+            Q_ASSERT(pm.isEditable(mode) == true);
+
+            qInfo() << "mode is removable: " << pm.isRemovable(mode) << " must be - true";
+            Q_ASSERT(pm.isRemovable(mode) == true);
+
+            qInfo() << "mode is serviceable: " << pm.isServiceable(mode) << " must be - true";
+            Q_ASSERT(pm.isServiceable(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.hasPermission(mode) << " must be - true";
+            Q_ASSERT(pm.hasPermission(mode) == true);
+
+            qInfo() << "mode has permission: " << pm.noPermission(mode) << " must be - false";
+            Q_ASSERT(pm.noPermission(mode) == false);
+
+        }
+
+        //test update
+        const int savedPreviousPV = mode.toInt();
+        pm.removePermission(mode, DFS::Permission::Read);
+        Q_ASSERT(savedPreviousPV != mode.toInt());
+
+        addPermission.permissionValue = mode.toInt();
+        pm.sign(actor, addPermission);
+        pm.updatePermission(addPermission);
+
+        //test search file permission by hash
+        auto list = pm.searchFileByHash(path, fileHash);
+        qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
+        Q_ASSERT(list.size() != 0);
+        Q_ASSERT(list.size() == 1);
+
+        const std::string nonExisthashFile = "3e55f3da4011200f000";
+        list = pm.searchFileByHash(path, nonExisthashFile);
+        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
+        Q_ASSERT(list.size() == 0);
+        Q_ASSERT(list.size() != 1);
+
+        //test search file prmittion by name
+        list = pm.searchFileById(path, actor.id().toStdString());
+        qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
+        Q_ASSERT(list.size() != 0);
+        Q_ASSERT(list.size() == 1);
+
+        std::string nonExistPartNameFile = "888843fce4";
+        list = pm.searchFileById(path, nonExistPartNameFile);
+        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
+        Q_ASSERT(list.size() == 0);
+        Q_ASSERT(list.size() != 1);
+
+        qInfo() << "Finished test permission manager";
+    });
 
     return app.exec();
 }
