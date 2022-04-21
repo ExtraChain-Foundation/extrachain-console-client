@@ -9,7 +9,6 @@
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
-#include "profile/private_profile.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
