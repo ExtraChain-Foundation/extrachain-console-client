@@ -205,6 +205,7 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     //    {
     //        qFatal("[Push] No actor index access");
     //    }
+    /*
     QByteArrayList profile = node->actorIndex()->getProfile(userId);
     if (profile.isEmpty())
         return message;
@@ -213,4 +214,5 @@ QString PushManager::notificationToMessage(const Notification &notification) {
         QString secName = profile.at(4);
         return message + name + " " + secName;
     }
+    */
 }

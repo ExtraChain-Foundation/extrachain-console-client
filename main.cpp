@@ -102,8 +102,12 @@ int main(int argc, char* argv[]) {
 
     QString argEmail = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
-    QString email = argEmail.isEmpty() ? ConsoleManager::getSomething("e-mail") : argEmail;
-    QString password = argPassword.isEmpty() ? ConsoleManager::getSomething("password") : argPassword;
+    QString email = argEmail.isEmpty() && !AutologinHash::isAvailable()
+        ? ConsoleManager::getSomething("e-mail")
+        : argEmail;
+    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
+        ? ConsoleManager::getSomething("password")
+        : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
@@ -153,8 +157,24 @@ int main(int argc, char* argv[]) {
         file.close();
     }
 
-    if (node->accountController()->count() == 0)
-        emit node->login(email.toUtf8(), password.toUtf8());
+    if (node->accountController()->count() == 0) {
+        std::string loginHash;
+        AutologinHash autologinHash;
+        if (AutologinHash::isAvailable() && autologinHash.load()) {
+            loginHash = autologinHash.hash();
+        } else {
+            loginHash = Utils::calcKeccak((email + password).toStdString());
+        }
+
+        auto result = node->login(loginHash);
+        if (!result) {
+            if (AccountController::profilesList().size() != 0)
+                qInfo() << "Error: Incorrect login or password";
+            else
+                qInfo() << "Error: No profiles files";
+            std::exit(-1);
+        }
+    }
 
     password.clear();
 

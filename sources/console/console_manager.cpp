@@ -9,7 +9,6 @@
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
-#include "profile/private_profile.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -225,20 +224,6 @@ void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &va
     // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
     // connect(resolver, &ResolveManager::saveNotificationToken, this,
     // &ConsoleManager::saveNotificationToken);
-
-    connect(node->privateProfile(), &PrivateProfile::loginError, [](int error) {
-        switch (error) {
-        case 1:
-            qInfo() << "! Profile files not found";
-            break;
-        case 2:
-            qInfo() << "! Incorrect email or password";
-            break;
-        }
-
-        if (error != 0)
-            qApp->exit();
-    });
 }
 
 void ConsoleManager::startInput() {
