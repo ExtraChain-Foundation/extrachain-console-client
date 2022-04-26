@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
         PermissionManager pm(node.get());
         qInfo() << "count accounts: "<< node->accountController()->count();
         qInfo() << "Start permission manager test:";
-        const std::string pathToAddFile = "/Users/andreea/Downloads/Ids.pdf";
+        const std::string pathToAddFile = "/Users/andreea/Downloads/Bars-1s-200px.gif";
         const auto actor = node->accountController()->mainActor();
         std::string localFile = node->dfs()->addLocalFile(actor, pathToAddFile, "console",
                                                           DFS::Encryption::Public);
@@ -351,28 +351,43 @@ int main(int argc, char* argv[]) {
         pm.updatePermission(addPermission);
 
         //test search file permission by hash
-        auto list = pm.searchFileByHash(path, fileHash);
-        qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
-        Q_ASSERT(list.size() != 0);
-        Q_ASSERT(list.size() == 1);
+//        auto list = pm.searchFileByHash(path, fileHash);
+//        qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
+//        Q_ASSERT(list.size() != 0);
+//        Q_ASSERT(list.size() == 1);
 
-        const std::string nonExisthashFile = "3e55f3da4011200f000";
-        list = pm.searchFileByHash(path, nonExisthashFile);
-        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
-        Q_ASSERT(list.size() == 0);
-        Q_ASSERT(list.size() != 1);
+//        const std::string nonExisthashFile = "3e55f3da4011200f000";
+//        list = pm.searchFileByHash(path, nonExisthashFile);
+//        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
+//        Q_ASSERT(list.size() == 0);
+//        Q_ASSERT(list.size() != 1);
 
         //test search file prmittion by name
-        list = pm.searchFileById(path, actor.id().toStdString());
+        const auto list = pm.searchFile(path, fileHash);
         qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
         Q_ASSERT(list.size() != 0);
         Q_ASSERT(list.size() == 1);
 
-        std::string nonExistPartNameFile = "888843fce4";
-        list = pm.searchFileById(path, nonExistPartNameFile);
-        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
-        Q_ASSERT(list.size() == 0);
-        Q_ASSERT(list.size() != 1);
+//        std::string nonExistPartNameFile = "888843fce4";
+//        list = pm.searchFileById(path, nonExistPartNameFile);
+//        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
+//        Q_ASSERT(list.size() == 0);
+//        Q_ASSERT(list.size() != 1);
+/*
+        qInfo() << "start serialize permission:";
+        pm.serializePermissionData(addPermission.actor, addPermission.permissionValue, addPermission);
+        qInfo() << "finished serialize permission:";
+*/
+//        qInfo() << "start deserialize permission:";
+//        pm.deserializePermissionData(addPermission);
+//        qInfo() << "finished deserialize permission:";
+
+        //test rename
+//        std::string oldFilehash = addPermission.fileHash;
+//        addPermission.fileHash = fileHash+"9999";
+//        qDebug() << QString::fromStdString(oldFilehash) << QString::fromStdString(addPermission.fileHash);
+//        pm.rename(oldFilehash, addPermission);
+
 
         qInfo() << "Finished test permission manager";
     });
