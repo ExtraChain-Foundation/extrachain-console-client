@@ -7,15 +7,10 @@
 #include <QStandardPaths>
 
 #include "console/console_manager.h"
+#include "datastorage/dfs/dfs_controller.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
-//#include "dfs/packages/headers/dfs_universal.h"
-#include "dfs/packages/headers/dfs_request.h"
-//#include "network/packages/service/downloaddfsrequest.h"
-#include "enc/enc_tools.h"
 #include "metatypes.h"
-
-#include "rextrachain/rextrachain.h"
 
 #ifndef EXTRACHAIN_CMAKE
     #include "preconfig.h"
@@ -23,10 +18,6 @@
 
 int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
-
-#ifdef EXTRACHAIN_ENABLE_RUST
-    qDebug() << "[Rust]" << EXTRACHAIN_RUST_VERSION << "|" << number_42();
-#endif
 
     app.setApplicationName("ExtraChain Console Client");
     app.setOrganizationName("ExtraChain Foundation");
@@ -46,12 +37,14 @@ int main(int argc, char* argv[]) {
     QCommandLineOption debugOption("debug", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
-    QCommandLineOption emailOption({ "e", "email" }, "Set email.", "email");
-    QCommandLineOption passOption({ "s", "password" }, "Set password.", "password");
+    QCommandLineOption emailOption({ "e", "email" }, "Set email", "email");
+    QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption createNetworkOption("create-network", "First network creation");
+    QCommandLineOption importOption("import", "Import from file", "import");
+    QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, createNetworkOption,
-                        clearDataOption });
+                        clearDataOption, importOption, netdebOption });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -66,6 +59,10 @@ int main(int argc, char* argv[]) {
 
     QLockFile lockFile(".console.lock");
     if (!lockFile.tryLock(100)) {
+        if (!QFile::exists(".console.lock")) {
+            qDebug() << "[Console] Unable to write files. Check folder permissions";
+            return -1;
+        }
         qDebug() << "[Console] Already running in directory" << QDir::currentPath();
         return -1;
     }
@@ -73,6 +70,7 @@ int main(int argc, char* argv[]) {
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
+    Network::networkDebug = parser.isSet(netdebOption);
 #endif
 
     qInfo() << " ┌───────────────────────────────────────────┐";
@@ -84,8 +82,8 @@ int main(int argc, char* argv[]) {
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
-                                << SecretKey::sodium_version().c_str() << ", Boost " << Utils::boostVersion()
-                                << ", Boost Asio " << Utils::boostAsioVersion();
+                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
+    // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
     qInfo() << "";
@@ -101,8 +99,12 @@ int main(int argc, char* argv[]) {
 
     QString argEmail = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
-    QString email = argEmail.isEmpty() ? ConsoleManager::getSomething("e-mail") : argEmail;
-    QString password = argPassword.isEmpty() ? ConsoleManager::getSomething("password") : argPassword;
+    QString email = argEmail.isEmpty() && !AutologinHash::isAvailable()
+        ? ConsoleManager::getSomething("e-mail")
+        : argEmail;
+    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
+        ? ConsoleManager::getSomething("password")
+        : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
@@ -113,11 +115,63 @@ int main(int argc, char* argv[]) {
     auto node = std::make_shared<ExtraChainNode>();
     console.setExtraChainNode(node);
 
+    // dfs temp
+    QObject::connect(node->dfs(), &DfsController::added,
+                     [](ActorId actorId, std::string fileHash, std::string visual, int64_t size) {
+                         qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
+                                 << QString::fromStdString(visual) << size;
+                     });
+    QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Downloaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloadProgress,
+                     [](ActorId actorId, std::string hash, int progress) {
+                         qInfo() << "[Console/DFS] Download progress:" << actorId
+                                 << QString::fromStdString(hash) << progress;
+                     });
+    QObject::connect(node->dfs(), &DfsController::uploadProgress,
+                     [](ActorId actorId, std::string fileHash, int progress) {
+                         qInfo() << "[Console/DFS] Upload progress:" << actorId
+                                 << QString::fromStdString(fileHash) << " " << progress;
+                     });
+
     if (isNewNetwork)
         node->createNewNetwork(email, password, "Etalonium Coin", "1111", "#fa4868");
 
-    if (node->accountController()->getAccountCount() == 0)
-        emit node->login(email.toUtf8(), password.toUtf8());
+    QString importFile = parser.value(importOption);
+    if (!importFile.isEmpty()) {
+        QFile file(importFile);
+        file.open(QFile::ReadOnly);
+        auto data = file.readAll().toStdString();
+        if (data.empty()) {
+            qInfo() << "Incorrect import";
+            std::exit(0);
+        }
+        node->importUser(data, email.toStdString(), password.toStdString());
+        file.close();
+    }
+
+    if (node->accountController()->count() == 0) {
+        std::string loginHash;
+        AutologinHash autologinHash;
+        if (AutologinHash::isAvailable() && autologinHash.load()) {
+            loginHash = autologinHash.hash();
+        } else {
+            loginHash = Utils::calcKeccak((email + password).toStdString());
+        }
+
+        auto result = node->login(loginHash);
+        if (!result) {
+            if (AccountController::profilesList().size() != 0)
+                qInfo() << "Error: Incorrect login or password";
+            else
+                qInfo() << "Error: No profiles files";
+            std::exit(-1);
+        }
+    }
 
     password.clear();
 

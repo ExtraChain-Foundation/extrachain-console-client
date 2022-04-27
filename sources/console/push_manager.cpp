@@ -1,27 +1,25 @@
 #include "console/push_manager.h"
 
+#include <QJsonObject>
+
 #include "datastorage/index/actorindex.h"
 
-PushManager::PushManager(QObject *parent)
+PushManager::PushManager(ExtraChainNode *node, QObject *parent)
     : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &PushManager::responseResolver);
-}
-
-void PushManager::setAccController(AccountController *accountController) {
-    m_accountController = accountController;
 }
 
 void PushManager::pushNotification(QString actorId, Notification notification) {
     if (!QFile::exists("notification"))
         return;
 
-    auto main = m_accountController->mainActor();
-    if (main.id() != m_accountController->getActorIndex()->firstId())
+    auto main = node->accountController()->mainActor();
+    if (main.id() != node->actorIndex()->firstId())
         return;
     auto &key = main.key();
 
-    QByteArray actorIdEncrypted = key.encryptSelf(actorId.toLatin1());
+    QByteArray actorIdEncrypted = QByteArray::fromStdString(key.encryptSelf(actorId.toStdString()));
     DBConnector db("notification");
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
                                 : db.select("SELECT * FROM Notification WHERE actorId = ?;", "Notification",
@@ -33,8 +31,8 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     }
 
     for (auto &&el : res) {
-        QString token = key.decryptSelf(QByteArray::fromStdString(el["token"]));
-        QString os = key.decryptSelf(QByteArray::fromStdString(el["os"]));
+        QString token = QString::fromStdString(key.decryptSelf(el["token"]));
+        QString os = QString::fromStdString(key.decryptSelf(el["os"]));
 
         if (os == "ios" || os == "android") {
             qDebug() << "[Push] New notification:" << actorId << notification;
@@ -50,30 +48,28 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "actorId  BLOB             NOT NULL, "
         "os       BLOB             NOT NULL);";
 
-    auto main = m_accountController->mainActor();
-    if (main.id() != m_accountController->getActorIndex()->firstId())
+    auto main = node->accountController()->mainActor();
+    if (main.id() != node->actorIndex()->firstId())
         return;
     auto &key = main.key();
 
-    QByteArray osActorId = actorId.toByteArray();
-    std::string apk = m_accountController->getActorIndex()->getActor(actorId).key().publicKey();
-    QByteArray osDecrypted = key.decrypt(os, apk);
-    QByteArray osToken = key.decrypt(token.toByteArray(), apk);
-    std::string osStr = key.encryptSelf(osDecrypted).toStdString();
-    std::string actorIdStr = key.encryptSelf(osActorId).toStdString();
-    std::string tokenStr = key.encryptSelf(osToken).toStdString();
+    const std::string &osActorId = actorId.toStdString();
+    std::string apk = node->actorIndex()->getActor(actorId).key().publicKey();
+    std::string osDecrypted = key.decrypt(os.toStdString(), apk);
+    std::string osToken = key.decrypt(token.toStdString(), apk);
 
     if (osDecrypted != "ios" && osDecrypted != "android") {
-        qDebug().noquote() << "[Push] Try save, but wrong os:" << osDecrypted;
+        qDebug().noquote() << "[Push] Try save, but wrong os:" << QByteArray::fromStdString(osDecrypted);
         return;
     }
 
     DBConnector db("notification");
     db.createTable(notificationTableCreation);
-    db.deleteRow("Notification", { { "token", tokenStr } });
-    db.insert("Notification", { { "actorId", actorIdStr }, { "token", tokenStr }, { "os", osStr } });
+    db.deleteRow("Notification", { { "token", osToken } });
+    db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
 
-    qDebug() << "[Push] Saved" << osDecrypted << osActorId << osToken;
+    qDebug() << "[Push] Saved" << QByteArray::fromStdString(osDecrypted)
+             << QByteArray::fromStdString(osActorId) << QByteArray::fromStdString(osToken);
 }
 
 void PushManager::responseResolver(QNetworkReply *reply) {
@@ -95,11 +91,11 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         QString token = json["errorText"].toString();
         qDebug() << "[Push] Remove token" << token;
 
-        auto &main = m_accountController->mainActor();
+        auto &main = node->accountController()->mainActor();
         auto &key = main.key();
 
         DBConnector db("notification");
-        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toLatin1()).toStdString() } });
+        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toStdString()) } });
     } else {
         qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
         // TODO: repeat request, ConnectionError
@@ -107,40 +103,40 @@ void PushManager::responseResolver(QNetworkReply *reply) {
 }
 
 void PushManager::chatMessage(QString sender, QString msgPath) {
-    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
-    QString chatId = msgPath.mid(32, 64);
+    //    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
+    //    QString chatId = msgPath.mid(32, 64);
 
-    std::string usersPath = CardManager::buildPathForFile(
-        userId.toStdString(), chatId.toStdString() + "/users", DfsStruct::Type(104));
-    DBConnector db(usersPath);
-    auto res = db.select("SELECT * FROM Users");
+    //    std::string usersPath = CardManager::buildPathForFile(
+    //        userId.toStdString(), chatId.toStdString() + "/users", DfsStruct::Type(104));
+    //    DBConnector db(usersPath);
+    //    auto res = db.select("SELECT * FROM Users");
 
-    if (res.size() == 2) {
-        QString users[2] = { QString::fromStdString(res[0]["userId"]),
-                             QString::fromStdString(res[1]["userId"]) };
+    //    if (res.size() == 2) {
+    //        QString users[2] = { QString::fromStdString(res[0]["userId"]),
+    //                             QString::fromStdString(res[1]["userId"]) };
 
-        pushNotification(
-            users[0] == sender ? users[1] : users[0],
-            Notification { .time = 100,
-                           .type = Notification::NotifyType::ChatMsg,
-                           .data = (users[0] == sender ? users[0] : users[1]).toLatin1() + " " });
-    };
+    //        pushNotification(
+    //            users[0] == sender ? users[1] : users[0],
+    //            Notification { .time = 100,
+    //                           .type = Notification::NotifyType::ChatMsg,
+    //                           .data = (users[0] == sender ? users[0] : users[1]).toLatin1() + " " });
+    //    };
 }
 
-void PushManager::fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId) {
-    Q_UNUSED(original)
+// void PushManager::fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId) {
+//     Q_UNUSED(original)
 
-    if (type == DfsStruct::Type::Post || type == DfsStruct::Type::Event) {
-        if (path.contains("."))
-            return;
+//    if (type == DfsStruct::Type::Post || type == DfsStruct::Type::Event) {
+//        if (path.contains("."))
+//            return;
 
-        Notification notify { .time = 100,
-                              .type = type == DfsStruct::Type::Post ? Notification::NewPost
-                                                                    : Notification::NewEvent,
-                              .data = actorId.toLatin1() + " " };
-        pushNotification("all", notify);
-    }
-}
+//        Notification notify { .time = 100,
+//                              .type = type == DfsStruct::Type::Post ? Notification::NewPost
+//                                                                    : Notification::NewEvent,
+//                              .data = actorId.toLatin1() + " " };
+//        pushNotification("all", notify);
+//    }
+//}
 
 void PushManager::sendNotification(const QString &token, const QString &os,
                                    const Notification &notification) {
@@ -205,12 +201,12 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     if (userId.isEmpty())
         return message;
 
-    auto actorIndex = m_accountController->getActorIndex();
     //    if (actorIndex == nullptr || !actorIndex)
     //    {
     //        qFatal("[Push] No actor index access");
     //    }
-    QByteArrayList profile = actorIndex->getProfile(userId);
+    /*
+    QByteArrayList profile = node->actorIndex()->getProfile(userId);
     if (profile.isEmpty())
         return message;
     else {
@@ -218,4 +214,5 @@ QString PushManager::notificationToMessage(const Notification &notification) {
         QString secName = profile.at(4);
         return message + name + " " + secName;
     }
+    */
 }

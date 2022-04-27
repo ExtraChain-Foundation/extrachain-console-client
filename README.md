@@ -2,13 +2,13 @@
 
 ## Software stack
 
-* Qt 6.2+
+* Qt 6.3+
 * CMake 3.21+
 * vcpkg
 * Compilers:
-  * Windows: MSVC 2019 or MSVC/Clang 9+
-  * Ubuntu or Linux: Clang 9+
-  * Android: NDK 21 (Clang 9)
+  * Windows: MSVC 2019 or MSVC/Clang 11+
+  * Ubuntu or Linux: Clang 11+ or GCC 11+
+  * Android: NDK 22 (Clang 11)
   * MacOS or iOS: Apple Clang
 
 ## Installation
@@ -23,25 +23,25 @@ Clone:
 
 For Ubuntu:
 
-    sudo apt install autoconf curl zip unzip tar libgmp-dev clang
+    sudo apt install autogen autoconf libtool curl zip unzip tar ninja-build
 
 3. And install vcpkg:
 
 Windows:
 
-    .\vcpkg\bootstrap-vcpkg.bat
     cd vcpkg
+    .\bootstrap-vcpkg.bat
 
 or Unix:
 
-    ./vcpkg/bootstrap-vcpkg.sh
     cd vcpkg
+    ./bootstrap-vcpkg.sh
 
 4. Install packages.
 
 For Windows x64:
 
-    .\vcpkg install libsodium:x64-windows sqlite3:x64-windows mpir:x64-windows
+    .\vcpkg install libsodium sqlite3 mpir boost-system boost-thread boost-variant boost-interprocess --triplet x64-windows
 
 and install integrate:
 
@@ -49,7 +49,11 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3
+    ./vcpkg install libsodium sqlite3 gmp boost-system boost-thread boost-variant boost-interprocess
+
+If Linux ARM, before:
+
+	export VCPKG_FORCE_SYSTEM_BINARIES=arm
 
 6. Build project.
 
@@ -62,7 +66,7 @@ Use something like:
 ### Qt Creator
 Open Tools → Options → Kits → %Your kit% → CMake Configuration → Change..., add CMAKE_TOOLCHAIN_FILE and save:
 
-    CMAKE_TOOLCHAIN_FILE:STRING=%YOUR VCPKG PATH%/scripts/buildsystems/vcpkg.cmake
+    -DCMAKE_TOOLCHAIN_FILE:FILEPATH=%YOUR VCPKG PATH%/scripts/buildsystems/vcpkg.cmake
 
 ### Visual Studio Code
 Use CMake extension and create file **.vscode/settings.json**:

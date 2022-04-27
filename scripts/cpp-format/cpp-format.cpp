@@ -39,7 +39,8 @@ int searchFromCurrentPath() {
 
     qInfo().noquote() << "Search in the current path:" << dir.path();
 
-    const auto folders = QStringList { "extrachain-core", "extrachain-console-client", "extrachain-ui-client" };
+    const auto folders =
+        QStringList { "extrachain-core", "extrachain-console-client", "extrachain-ui-client" };
     while (dir.cdUp()) {
         const auto dirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 

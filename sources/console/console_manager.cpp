@@ -1,13 +1,14 @@
 #include "console/console_manager.h"
+
+#include <QProcess>
+#include <QTextStream>
+
+#include "datastorage/dfs/dfs_controller.h"
+#include "datastorage/index/actorindex.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
-#include "profile/private_profile.h"
-#include "resolve/resolve_manager.h"
-
-#include <QProcess>
-#include <QTextStream>
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -23,7 +24,7 @@ ConsoleManager::ConsoleManager(QObject *parent)
     , notifierInput(stdin, QIODevice::ReadOnly)
 #endif
 {
-    m_pushManager = new PushManager(this);
+    m_pushManager = new PushManager(node.get());
 }
 
 ConsoleManager::~ConsoleManager() {
@@ -111,7 +112,7 @@ void ConsoleManager::commandReceiver(QString command) {
             QByteArray toAmount = sendtx[2].toUtf8();
             qDebug() << "sendtx" << toId << toAmount;
 
-            ActorId receiver(toId);
+            ActorId receiver(toId.toStdString());
             BigNumber amount = Transaction::visibleToAmount(toAmount);
 
             if (mainActorId != firstId)
@@ -122,47 +123,22 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command == "cn count" || command == "connections count") {
-        qInfo() << "Connections:" << node->networkManager()->connections().length();
-        qInfo() << "DFS Connections:" << node->dfs()->networkManager()->connections().length();
+        qInfo() << "Connections:" << node->network()->connections().length();
     }
 
     if (command == "cn list" || command == "connections list") {
-        auto &connections = node->networkManager()->connections();
-        auto &dfsConnections = node->dfs()->networkManager()->connections();
-        auto print = [](auto el) {
-            qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
-                              << el->protocolString() << el->identifier();
-        };
+        auto &connections = node->network()->connections();
 
         if (connections.length() > 0) {
             qInfo() << "Connections:";
-            std::for_each(connections.begin(), connections.end(), print);
-        }
-        if (dfsConnections.length() > 0) {
-            qInfo() << "DFS Connections:";
-            std::for_each(dfsConnections.begin(), dfsConnections.end(), print);
-        }
-        if (connections.length() == 0 && dfsConnections.length() == 0)
+            std::for_each(connections.begin(), connections.end(), [](auto &el) {
+                qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
+                                  << el->protocolString() << el->identifier();
+            });
+        } else {
             qInfo() << "No connections";
-        qInfo() << "-----------";
-    }
-
-    // TODO: actor create LOGIN PASSWORD
-
-    if (command.left(14) == "network create") {
-        // TODO
-        return;
-        QString loginPassword = command.mid(15);
-
-        auto list = loginPassword.indexOf(" ") != -1 ? loginPassword.split(" ") : QStringList {};
-
-        if (loginPassword.isEmpty() || list.length() != 2) {
-            qInfo() << "Incorrect login or password.";
-            qInfo() << "Command usage: network create LOGIN PASSWORD";
-            return;
         }
-
-        // node->createNewNetwork(list[0], list[1]);
+        qInfo() << "-----------";
     }
 
     if (command.left(7) == "connect") {
@@ -175,37 +151,35 @@ void ConsoleManager::commandReceiver(QString command) {
             ip = Utils::findLocalIp().ip().toString();
         QString protocol = list[1];
 
-        if (Utils::isValidIp(ip) && (protocol == "tcp" || protocol == "ws")) {
-            auto networkProtocol = protocol == "tcp" ? Network::Protocol::Tcp : Network::Protocol::WebSocket;
+        if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
+            auto networkProtocol = Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
-            node.get()->networkManager()->connectToNode(ip, networkProtocol);
-            emit node.get()->dfs()->connectToNode(ip, networkProtocol);
+            node.get()->network()->connectToNode(ip, networkProtocol);
         } else {
             qInfo() << "Invalid connect input";
         }
     }
 
-    if (command.left(10) == "disconnect") {
-        // qInfo().noquote() << "Disconnect";
-        // emit node.get()->removeConnection("");
-    }
-
-    if (command.left(4) == "gena") {
+    if (command.left(7) == "wallet ") {
         auto list = command.split(" ");
+        if (list.length() > 1) {
+            if (list[1] == "new") {
+                auto actor = node->accountController()->createWallet();
+                qInfo() << "Wallet created:" << actor.id();
+            }
 
-        if (list.length() != 2)
-            return;
-
-        long long count = list[1].toLongLong();
-
-        // generate as wallets for now
-        for (long long i = 0; i != count; ++i) {
-            auto hash = node->privateProfile()->hash();
-            auto actor = accController->createActor(ActorType::User, hash);
-            emit node->savePrivateProfile(hash, actor.id());
+            if (list[1] == "list") {
+                qInfo() << "Wallets:";
+                auto actors = node->accountController()->accounts();
+                auto mainId = node->accountController()->mainActor().id();
+                qInfo() << "User" << mainId;
+                for (const auto &actor : actors) {
+                    if (actor.id() != node->accountController()->mainActor().id()) {
+                        qInfo() << "Wallet" << actor.id();
+                    }
+                }
+            }
         }
-        qInfo() << "----------------------------------------------------------------";
-        qInfo() << "Actors generation complete, count:" << count;
     }
 
     if (command.left(4) == "push") {
@@ -213,6 +187,25 @@ void ConsoleManager::commandReceiver(QString command) {
         QString actorId = command.mid(5, 20);
         Notification notify { .time = 100, .type = Notification::NewPost, .data = actorId.toLatin1() + " " };
         m_pushManager->pushNotification(actorId, notify);
+    }
+
+    if (command.left(8) == "dfs add ") {
+        auto file = command.mid(8).toStdWString();
+        qInfo() << "Adding file to DFS:" << command.mid(8).data();
+
+        node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
+                                  DFS::Encryption::Public);
+    }
+
+    if (command.left(6) == "export") {
+        auto data = QString::fromStdString(node->exportUser());
+        QString fileName =
+            QString("%1.extrachain").arg(node->accountController()->mainActor().id().toString());
+        QFile file(fileName);
+        file.open(QFile::WriteOnly);
+        if (file.write(data.toUtf8()) > 1)
+            qInfo() << "Exported to" << fileName;
+        file.close();
     }
 }
 
@@ -223,29 +216,14 @@ PushManager *ConsoleManager::pushManager() const {
 void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &value) {
     node = value;
     accController = node->accountController();
-    networkManager = node->networkManager();
+    networkManager = node->network();
 
-    m_pushManager->setAccController(accController);
     auto dfs = node->dfs();
-    auto resolver = node->resolveManager();
     connect(node.get(), &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
-    connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
-    connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
-    connect(resolver, &ResolveManager::saveNotificationToken, this, &ConsoleManager::saveNotificationToken);
-
-    connect(node->privateProfile(), &PrivateProfile::loginError, [](int error) {
-        switch (error) {
-        case 1:
-            qInfo() << "! Profile files not found";
-            break;
-        case 2:
-            qInfo() << "! Incorrect email or password";
-            break;
-        }
-
-        if (error != 0)
-            qApp->exit();
-    });
+    // connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
+    // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
+    // connect(resolver, &ResolveManager::saveNotificationToken, this,
+    // &ConsoleManager::saveNotificationToken);
 }
 
 void ConsoleManager::startInput() {
