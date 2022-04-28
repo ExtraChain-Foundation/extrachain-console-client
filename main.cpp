@@ -178,13 +178,19 @@ int main(int argc, char* argv[]) {
 
     password.clear();
 
+    //test Permission Manager
     QObject::connect(node.get(), &ExtraChainNode::ready, [&]() {
         qInfo() << "ready to test permission manager";
 
         PermissionManager pm(node.get());
         qInfo() << "count accounts: "<< node->accountController()->count();
         qInfo() << "Start permission manager test:";
-        const std::string pathToAddFile = "/Users/andreea/Downloads/Bars-1s-200px.gif";
+        const std::string pathToAddFile = ""; //fill in path to file
+
+        if(pathToAddFile.empty()) {
+            qFatal("path to file is empty.");
+            return;
+        }
         const auto actor = node->accountController()->mainActor();
         std::string localFile = node->dfs()->addLocalFile(actor, pathToAddFile, "console",
                                                           DFS::Encryption::Public);
@@ -211,7 +217,6 @@ int main(int argc, char* argv[]) {
 
         const auto publicActor = node->actorIndex()->getActor(actor.id());
         qInfo() << "public actor key: "<< publicActor.key();
-
         qInfo() << "verify: " << pm.verify(publicActor, addPermission);
         Q_ASSERT(pm.verify(publicActor, addPermission) == true);
         {
@@ -368,46 +373,90 @@ int main(int argc, char* argv[]) {
 
         addPermission.permissionValue = mode.toInt();
         pm.sign(actor, addPermission);
-        pm.updatePermission(addPermission);
+        DFS::Permission::UpdatePermission updatePermission;
+        updatePermission.actor = addPermission.actor;
+        updatePermission.fileHash = addPermission.fileHash;
+        updatePermission.path = addPermission.path;
+        updatePermission.signature = addPermission.signature;
+        updatePermission.userId = addPermission.userId;
+        updatePermission.permissionValue = addPermission.permissionValue;
 
-        //test search file permission by hash
-//        auto list = pm.searchFileByHash(path, fileHash);
-//        qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
-//        Q_ASSERT(list.size() != 0);
-//        Q_ASSERT(list.size() == 1);
+        pm.updatePermission(updatePermission);
 
-//        const std::string nonExisthashFile = "3e55f3da4011200f000";
-//        list = pm.searchFileByHash(path, nonExisthashFile);
-//        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
-//        Q_ASSERT(list.size() == 0);
-//        Q_ASSERT(list.size() != 1);
-
-        //test search file prmittion by name
-        const auto list = pm.searchFile(path, fileHash);
+        //test search file prmittion by hash file
+        auto list = pm.searchFile(path, fileHash);
         qInfo() << "count founded files:" << list.size() << ". Must be not 0.";
         Q_ASSERT(list.size() != 0);
         Q_ASSERT(list.size() == 1);
 
-//        std::string nonExistPartNameFile = "888843fce4";
-//        list = pm.searchFileById(path, nonExistPartNameFile);
-//        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
-//        Q_ASSERT(list.size() == 0);
-//        Q_ASSERT(list.size() != 1);
-/*
-        qInfo() << "start serialize permission:";
-        pm.serializePermissionData(addPermission.actor, addPermission.permissionValue, addPermission);
-        qInfo() << "finished serialize permission:";
-*/
-//        qInfo() << "start deserialize permission:";
-//        pm.deserializePermissionData(addPermission);
-//        qInfo() << "finished deserialize permission:";
+        std::string nonExistPartNameFile = "888843fce4";
+        list = pm.searchFile(path, nonExistPartNameFile);
+        qInfo() << "count founded files:" << list.size() << ". Must be 0.";
+        Q_ASSERT(list.size() == 0);
+        Q_ASSERT(list.size() != 1);
 
-        //test rename
-//        std::string oldFilehash = addPermission.fileHash;
-//        addPermission.fileHash = fileHash+"9999";
-//        qDebug() << QString::fromStdString(oldFilehash) << QString::fromStdString(addPermission.fileHash);
-//        pm.rename(oldFilehash, addPermission);
+        qInfo() << "[start test update permission]";
 
+        std::vector<DFS::Permission::UpdatePermission> upList;
+
+        DFS::Permission::UpdatePermission addUpdatePermission;
+        DFS::Permission::UpdatePermission rmUpdatePermission;
+        DFS::Permission::UpdatePermission updtPermission;
+
+        addUpdatePermission = updatePermission;
+        addUpdatePermission.fileHash += "_add";
+        addUpdatePermission.action = DFS::Permission::Action::AddAction;
+
+        rmUpdatePermission = updatePermission;
+        rmUpdatePermission.fileHash += "_rm";
+        rmUpdatePermission.action = DFS::Permission::Action::RemoveAction;
+
+        updtPermission = updatePermission;
+        updtPermission.permissionValue = 0;
+        updtPermission.action = DFS::Permission::Action::UpdateAction;
+
+        DFS::Permission::PermissionMode modeForUpdtPermission;
+        pm.addPermission(modeForUpdtPermission, DFS::Permission::Service);
+        updtPermission.permissionValue = static_cast<short>(modeForUpdtPermission.toInt());
+        Q_ASSERT(updtPermission.permissionValue != 0);
+
+        upList.push_back(addUpdatePermission);
+        upList.push_back(rmUpdatePermission);
+        upList.push_back(updtPermission);
+
+        Q_ASSERT(upList.size() != 0);
+        Q_ASSERT(upList.size() == 3);
+
+        std::string pathtoAddUpdatePermission = DFS::Permission::rootDir + "/" + addUpdatePermission.actor + "/"
+                                                + addUpdatePermission.fileHash + DFS::Permission::permissionFileExtension;
+
+        std::string pathtoUpdatePermission = DFS::Permission::rootDir + "/" + updtPermission.actor + "/"
+                                                + updtPermission.fileHash + DFS::Permission::permissionFileExtension;
+
+        std::string pathtoRmUpdatePermission = DFS::Permission::rootDir + "/" + rmUpdatePermission.actor + "/"
+            + rmUpdatePermission.fileHash + DFS::Permission::permissionFileExtension;
+
+        node->dfs()->updatePermissions(upList);
+        qInfo() << "[path to permission " << QString::fromStdString(addUpdatePermission.fileHash) << " is "
+                << (std::filesystem::exists(pathtoAddUpdatePermission) ? "exist.]" : "not exist.]");
+        Q_ASSERT(std::filesystem::exists(pathtoAddUpdatePermission) == true);
+
+        qInfo() << "[path to permission " << QString::fromStdString(updtPermission.fileHash) << " is "
+                << (std::filesystem::exists(pathtoUpdatePermission) ? "exist.]" : "not exist.]");
+        Q_ASSERT(std::filesystem::exists(pathtoUpdatePermission) == true);
+
+        qInfo() << "[path to permission " << QString::fromStdString(rmUpdatePermission.fileHash) << " is "
+                << (std::filesystem::exists(pathtoRmUpdatePermission) ? "exist.]" : "not exist.]");
+        Q_ASSERT(std::filesystem::exists(pathtoRmUpdatePermission) == false);
+        Q_ASSERT(updtPermission.permissionValue != 0);
+        Q_ASSERT(updtPermission.permissionValue == DFS::Permission::Service);
+
+        addUpdatePermission.action = DFS::Permission::Action::RemoveAction;
+        node->dfs()->updatePermissions({addUpdatePermission});
+        qInfo() << "start remove first permission";
+        qInfo() << "[path to permission " << QString::fromStdString(addUpdatePermission.fileHash) << " is "
+                << (std::filesystem::exists(pathtoAddUpdatePermission) ? "exist.]" : "not exist.]");
+        Q_ASSERT(std::filesystem::exists(pathtoAddUpdatePermission) == false);
 
         qInfo() << "Finished test permission manager";
     });
