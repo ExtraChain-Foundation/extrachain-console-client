@@ -161,6 +161,7 @@ int main(int argc, char* argv[]) {
             loginHash = autologinHash.hash();
         } else {
             loginHash = Utils::calcKeccak((email + password).toStdString());
+            password.clear();
         }
 
         auto result = node->login(loginHash);
@@ -172,8 +173,6 @@ int main(int argc, char* argv[]) {
             std::exit(-1);
         }
     }
-
-    password.clear();
 
     return app.exec();
 }

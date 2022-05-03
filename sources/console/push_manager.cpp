@@ -21,6 +21,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
 
     QByteArray actorIdEncrypted = QByteArray::fromStdString(key.encryptSelf(actorId.toStdString()));
     DBConnector db("notification");
+    db.open();
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
                                 : db.select("SELECT * FROM Notification WHERE actorId = ?;", "Notification",
                                             { { "actorId", actorIdEncrypted.toStdString() } });
@@ -64,6 +65,7 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
     }
 
     DBConnector db("notification");
+    db.open();
     db.createTable(notificationTableCreation);
     db.deleteRow("Notification", { { "token", osToken } });
     db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
@@ -95,6 +97,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         auto &key = main.key();
 
         DBConnector db("notification");
+        db.open();
         db.deleteRow("Notification", { { "token", key.encryptSelf(token.toStdString()) } });
     } else {
         qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
@@ -109,6 +112,7 @@ void PushManager::chatMessage(QString sender, QString msgPath) {
     //    std::string usersPath = CardManager::buildPathForFile(
     //        userId.toStdString(), chatId.toStdString() + "/users", DfsStruct::Type(104));
     //    DBConnector db(usersPath);
+    //    db.open();
     //    auto res = db.select("SELECT * FROM Users");
 
     //    if (res.size() == 2) {
