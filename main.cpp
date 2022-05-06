@@ -112,34 +112,12 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    auto node = std::make_shared<ExtraChainNode>();
-    console.setExtraChainNode(node);
-
-    // dfs temp
-    QObject::connect(node->dfs(), &DfsController::added,
-                     [](ActorId actorId, std::string fileHash, std::string visual, int64_t size) {
-                         qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
-                                 << QString::fromStdString(visual) << size;
-                     });
-    QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
-        qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
-    });
-    QObject::connect(node->dfs(), &DfsController::downloaded, [](ActorId actorId, std::string fileHash) {
-        qInfo() << "[Console/DFS] Downloaded" << actorId << QString::fromStdString(fileHash);
-    });
-    QObject::connect(node->dfs(), &DfsController::downloadProgress,
-                     [](ActorId actorId, std::string hash, int progress) {
-                         qInfo() << "[Console/DFS] Download progress:" << actorId
-                                 << QString::fromStdString(hash) << progress;
-                     });
-    QObject::connect(node->dfs(), &DfsController::uploadProgress,
-                     [](ActorId actorId, std::string fileHash, int progress) {
-                         qInfo() << "[Console/DFS] Upload progress:" << actorId
-                                 << QString::fromStdString(fileHash) << " " << progress;
-                     });
+    ExtraChainNode node;
+    console.setExtraChainNode(&node);
+    console.dfsStat();
 
     if (isNewNetwork)
-        node->createNewNetwork(email, password, "Etalonium Coin", "1111", "#fa4868");
+        node.createNewNetwork(email, password, "Some Coin", "1111", "#ffffff");
 
     QString importFile = parser.value(importOption);
     if (!importFile.isEmpty()) {
@@ -150,11 +128,11 @@ int main(int argc, char* argv[]) {
             qInfo() << "Incorrect import";
             std::exit(0);
         }
-        node->importUser(data, email.toStdString(), password.toStdString());
+        node.importUser(data, email.toStdString(), password.toStdString());
         file.close();
     }
 
-    if (node->accountController()->count() == 0) {
+    if (node.accountController()->count() == 0) {
         std::string loginHash;
         AutologinHash autologinHash;
         if (AutologinHash::isAvailable() && autologinHash.load()) {
@@ -164,7 +142,7 @@ int main(int argc, char* argv[]) {
             password.clear();
         }
 
-        auto result = node->login(loginHash);
+        auto result = node.login(loginHash);
         if (!result) {
             if (AccountController::profilesList().size() != 0)
                 qInfo() << "Error: Incorrect login or password";
