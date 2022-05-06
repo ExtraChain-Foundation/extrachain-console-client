@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
         if (AutologinHash::isAvailable() && autologinHash.load()) {
             loginHash = autologinHash.hash();
         } else {
-            loginHash = Utils::calcKeccak((email + password).toStdString());
+            loginHash = Utils::calcHash((email + password).toStdString());
             password.clear();
         }
 
