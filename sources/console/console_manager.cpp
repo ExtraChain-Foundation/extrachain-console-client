@@ -248,7 +248,7 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
 
 void ConsoleManager::dfsStat() {
     QObject::connect(node->dfs(), &DfsController::added,
-                     [](ActorId actorId, std::string fileHash, std::string visual, int64_t size) {
+                     [](ActorId actorId, std::string fileHash, std::string visual, uint64_t size) {
                          qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
                                  << QString::fromStdString(visual) << size;
                      });

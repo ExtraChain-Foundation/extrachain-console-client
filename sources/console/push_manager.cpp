@@ -205,6 +205,8 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     if (userId.isEmpty())
         return message;
 
+    return "";
+
     //    if (actorIndex == nullptr || !actorIndex)
     //    {
     //        qFatal("[Push] No actor index access");
