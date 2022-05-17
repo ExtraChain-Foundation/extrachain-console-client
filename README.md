@@ -41,7 +41,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium sqlite3 mpir boost-system boost-thread boost-variant boost-interprocess fmt --triplet x64-windows
+    .\vcpkg install libsodium sqlite3 mpir boost-system boost-thread boost-variant boost-interprocess fmt magic-enum --triplet x64-windows
 
 and install integrate:
 
@@ -49,7 +49,7 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3 gmp boost-system boost-thread boost-variant boost-interprocess fmt
+    ./vcpkg install libsodium sqlite3 gmp boost-system boost-thread boost-variant boost-interprocess fmt magic-enum
 
 If Linux ARM, before:
 
