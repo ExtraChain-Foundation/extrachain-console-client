@@ -24,7 +24,7 @@ ConsoleManager::ConsoleManager(QObject *parent)
     , notifierInput(stdin, QIODevice::ReadOnly)
 #endif
 {
-    m_pushManager = new PushManager(node.get());
+    m_pushManager = new PushManager(node);
 }
 
 ConsoleManager::~ConsoleManager() {
@@ -103,7 +103,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "sendtx") {
         qDebug() << "sendtx";
-        auto mainActorId = accController->mainActor().id();
+        auto mainActorId = node->accountController()->mainActor().id();
         ActorId firstId = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");
@@ -154,7 +154,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
-            node.get()->network()->connectToNode(ip, networkProtocol);
+            node->network()->connectToNode(ip, networkProtocol);
         } else {
             qInfo() << "Invalid connect input";
         }
@@ -213,13 +213,11 @@ PushManager *ConsoleManager::pushManager() const {
     return m_pushManager;
 }
 
-void ConsoleManager::setExtraChainNode(const std::shared_ptr<ExtraChainNode> &value) {
+void ConsoleManager::setExtraChainNode(ExtraChainNode *value) {
     node = value;
-    accController = node->accountController();
-    networkManager = node->network();
 
-    auto dfs = node->dfs();
-    connect(node.get(), &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
+    // auto dfs = node->dfs();
+    connect(node, &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
     // connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
     // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
     // connect(resolver, &ResolveManager::saveNotificationToken, this,
@@ -246,6 +244,30 @@ void ConsoleManager::startInput() {
 
 void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId token) {
     m_pushManager->saveNotificationToken(os, actorId, token);
+}
+
+void ConsoleManager::dfsStat() {
+    QObject::connect(node->dfs(), &DfsController::added,
+                     [](ActorId actorId, std::string fileHash, std::string visual, uint64_t size) {
+                         qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
+                                 << QString::fromStdString(visual) << size;
+                     });
+    QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloaded, [](ActorId actorId, std::string fileHash) {
+        qInfo() << "[Console/DFS] Downloaded" << actorId << QString::fromStdString(fileHash);
+    });
+    QObject::connect(node->dfs(), &DfsController::downloadProgress,
+                     [](ActorId actorId, std::string hash, int progress) {
+                         qInfo() << "[Console/DFS] Download progress:" << actorId
+                                 << QString::fromStdString(hash) << progress;
+                     });
+    QObject::connect(node->dfs(), &DfsController::uploadProgress,
+                     [](ActorId actorId, std::string fileHash, int progress) {
+                         qInfo() << "[Console/DFS] Upload progress:" << actorId
+                                 << QString::fromStdString(fileHash) << " " << progress;
+                     });
 }
 
 QString ConsoleManager::getSomething(const QString &name) {

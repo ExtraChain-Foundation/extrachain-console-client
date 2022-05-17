@@ -7,7 +7,7 @@
 * vcpkg
 * Compilers:
   * Windows: MSVC 2019 or MSVC/Clang 11+
-  * Ubuntu or Linux: Clang 11+ or GCC 11+
+  * Ubuntu: Clang 11+ or GCC 11+
   * Android: NDK 22 (Clang 11)
   * MacOS or iOS: Apple Clang
 
@@ -23,7 +23,7 @@ Clone:
 
 For Ubuntu:
 
-    sudo apt install autogen autoconf libtool curl zip unzip tar ninja-build
+    sudo apt install autogen autoconf libtool curl zip unzip tar ninja-build pkg-config
 
 3. And install vcpkg:
 
@@ -41,7 +41,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium sqlite3 mpir boost-system boost-thread boost-variant boost-interprocess --triplet x64-windows
+    .\vcpkg install libsodium sqlite3 mpir boost-system boost-thread boost-variant boost-interprocess fmt magic-enum --triplet x64-windows
 
 and install integrate:
 
@@ -49,7 +49,7 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3 gmp boost-system boost-thread boost-variant boost-interprocess
+    ./vcpkg install libsodium sqlite3 gmp boost-system boost-thread boost-variant boost-interprocess fmt magic-enum
 
 If Linux ARM, before:
 

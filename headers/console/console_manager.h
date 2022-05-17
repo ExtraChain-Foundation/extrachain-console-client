@@ -24,8 +24,9 @@ public:
     ~ConsoleManager();
 
     PushManager *pushManager() const;
-    void setExtraChainNode(const std::shared_ptr<ExtraChainNode> &value);
+    void setExtraChainNode(ExtraChainNode *node);
     void startInput();
+    void dfsStat();
 
     static QString getSomething(const QString &name);
 
@@ -45,9 +46,7 @@ private:
     ConsoleInput consoleInput;
 #endif
 
-    std::shared_ptr<ExtraChainNode> node;
-    AccountController *accController;
-    NetworkManager *networkManager;
+    ExtraChainNode *node;
     PushManager *m_pushManager;
 };
 
