@@ -6,8 +6,6 @@ QT -= gui
 TARGET = extrachain-console
 CONFIG -= app_bundle
 CONFIG += c++2a console
-
-DEFINES += ECONSOLE
 DEFINES += QT_DEPRECATED_WARNINGS
 
 INCLUDEPATH += headers
