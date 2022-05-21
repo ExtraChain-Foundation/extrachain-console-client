@@ -23,7 +23,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Build)
 add_executable(extrachain-console
     ${EXTRACHAIN_CONSOLE_SOURCES}
     )
-add_definitions(-DECONSOLE)
+
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
 # git
