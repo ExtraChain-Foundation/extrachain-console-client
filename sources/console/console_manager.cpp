@@ -191,10 +191,14 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(8) == "dfs add ") {
         auto file = command.mid(8).toStdWString();
-        qInfo() << "Adding file to DFS:" << command.mid(8).data();
+        qInfo() << "Adding file to DFS:" << command.mid(8);
 
-        node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
-                                  DFS::Encryption::Public);
+        auto result = node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
+                                                DFS::Encryption::Public);
+        auto res = QString::fromStdString(result);
+        if (res.left(5) == "Error") {
+            qDebug() << res;
+        }
     }
 
     if (command.left(6) == "export") {
@@ -246,7 +250,7 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
     m_pushManager->saveNotificationToken(os, actorId, token);
 }
 
-void ConsoleManager::dfsStat() {
+void ConsoleManager::dfsStart() {
     QObject::connect(node->dfs(), &DfsController::added,
                      [](ActorId actorId, std::string fileHash, std::string visual, uint64_t size) {
                          qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)

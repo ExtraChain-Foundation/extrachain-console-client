@@ -26,7 +26,7 @@ public:
     PushManager *pushManager() const;
     void setExtraChainNode(ExtraChainNode *node);
     void startInput();
-    void dfsStat();
+    void dfsStart();
 
     static QString getSomething(const QString &name);
 
