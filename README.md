@@ -21,9 +21,10 @@ Clone:
 
 2. Install some dependencies:
 
-For Ubuntu:
+For Ubuntu 22.04:
 
-    sudo apt install autogen autoconf libtool curl zip unzip tar ninja-build pkg-config
+    sudo apt install curl zip unzip tar
+    bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
 3. And install vcpkg:
 
