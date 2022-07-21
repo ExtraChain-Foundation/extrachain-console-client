@@ -197,6 +197,21 @@ void ConsoleManager::commandReceiver(QString command) {
                                   DFS::Encryption::Public);
     }
 
+    if (command.left(8) == "dfs get ") {
+        auto list = command.split(" ");
+        if (list.size() < 4) {
+            qInfo() << "List has less 2 parameters";
+        } else {
+            const std::string pathToNewFolder = list[2].toStdString();
+            const std::string pathToDfsFile = list[3].toStdString();
+            if (list.size() == 5) {
+                node->dfs()->exportFile(pathToNewFolder, pathToDfsFile, list[4].toStdString());
+            } else if (list.size() == 4) {
+                node->dfs()->exportFile(pathToNewFolder, pathToDfsFile);
+            }
+        }
+    }
+
     if (command.left(6) == "export") {
         auto data = QString::fromStdString(node->exportUser());
         QString fileName =
