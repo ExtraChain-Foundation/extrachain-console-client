@@ -32,7 +32,7 @@ ConsoleManager::~ConsoleManager() {
 }
 
 void ConsoleManager::commandReceiver(QString command) {
-    command = command.simplified().toLower();
+    command = command.simplified();
     qDebug() << "[Console] Input:" << command;
 
     // TODO: process coin request
