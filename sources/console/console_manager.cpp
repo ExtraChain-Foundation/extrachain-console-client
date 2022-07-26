@@ -204,6 +204,11 @@ void ConsoleManager::commandReceiver(QString command) {
         } else {
             const std::string pathToNewFolder = list[2].toStdString();
             const std::string pathToDfsFile = list[3].toStdString();
+            if(pathToNewFolder.empty() || pathToDfsFile.empty()) {
+                 qDebug() << "One or more parameters is empty. Please check in parameters.";
+                 return;
+            }
+
             if (list.size() == 5) {
                 node->dfs()->exportFile(pathToNewFolder, pathToDfsFile, list[4].toStdString());
             } else if (list.size() == 4) {
