@@ -191,9 +191,10 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(8) == "dfs add ") {
         auto file = command.mid(8).toStdWString();
+        std::filesystem::path filepath(file);
         qInfo() << "Adding file to DFS:" << command.mid(8).data();
 
-        node->dfs()->addLocalFile(node->accountController()->mainActor(), file, "console",
+        node->dfs()->addLocalFile(node->accountController()->mainActor(), file, filepath.filename().string(),
                                   DFS::Encryption::Public);
     }
 
@@ -204,9 +205,9 @@ void ConsoleManager::commandReceiver(QString command) {
         } else {
             const std::string pathToNewFolder = list[2].toStdString();
             const std::string pathToDfsFile = list[3].toStdString();
-            if(pathToNewFolder.empty() || pathToDfsFile.empty()) {
-                 qDebug() << "One or more parameters is empty. Please check in parameters.";
-                 return;
+            if (pathToNewFolder.empty() || pathToDfsFile.empty()) {
+                qDebug() << "One or more parameters is empty. Please check in parameters.";
+                return;
             }
 
             if (list.size() == 5) {
