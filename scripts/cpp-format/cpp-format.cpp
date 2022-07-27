@@ -33,13 +33,14 @@ int searchFromCurrentPath() {
     qInfo() << "Can't find path from args";
     auto dir = QDir::current();
 
-    if (!dir.path().contains("/etalonium-console/")) {
+    if (!dir.path().contains("/extrachain-console-client/")) {
         return -1;
     }
 
     qInfo().noquote() << "Search in the current path:" << dir.path();
 
-    const auto folders = QStringList { "extrachain-core", "etalonium-console", "etalonium-mobile" };
+    const auto folders =
+        QStringList { "extrachain-core", "extrachain-console-client", "extrachain-ui-client" };
     while (dir.cdUp()) {
         const auto dirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
