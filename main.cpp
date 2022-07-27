@@ -43,8 +43,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption createNetworkOption("create-network", "First network creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
+    QCommandLineOption dfsLimitOption("dfs-limit", "Temp", "dfs-limit");
     parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, createNetworkOption,
-                        clearDataOption, importOption, netdebOption });
+                        clearDataOption, importOption, netdebOption, dfsLimitOption });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -114,7 +115,16 @@ int main(int argc, char* argv[]) {
 
     ExtraChainNode node;
     console.setExtraChainNode(&node);
-    console.dfsStat();
+    console.dfsStart();
+
+    QString dfsLimit = parser.value(dfsLimitOption);
+    if (!dfsLimit.isEmpty()) {
+        bool isOk = false;
+        quint64 limit = dfsLimit.toULongLong(&isOk);
+        if (isOk) {
+            node.dfs()->setBytesLimit(limit);
+        }
+    }
 
     if (isNewNetwork)
         node.createNewNetwork(email, password, "Some Coin", "1111", "#ffffff");
