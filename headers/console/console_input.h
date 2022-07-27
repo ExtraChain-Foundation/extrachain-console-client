@@ -18,7 +18,7 @@ public slots:
     void process();
 
 private:
-    QTextStream *notifierInput;
+    QTextStream *notifierInput = nullptr;
 };
 
 #endif // WINDOWSINPUT_H
