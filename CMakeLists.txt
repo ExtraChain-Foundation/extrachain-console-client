@@ -24,6 +24,10 @@ add_executable(extrachain-console
     ${EXTRACHAIN_CONSOLE_SOURCES}
     )
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../wasm3/source ${CMAKE_BINARY_DIR}/m3)
+set(target ${CMAKE_PROJECT_NAME})
+target_link_libraries(${target} PRIVATE m3)
+
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
 # git
@@ -38,3 +42,9 @@ target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extracha
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+add_library(wasm3_cpp INTERFACE)
+target_include_directories(wasm3_cpp INTERFACE include)
+target_compile_features(wasm3_cpp INTERFACE cxx_std_17)
+
+
