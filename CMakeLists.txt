@@ -10,9 +10,12 @@ set(EXTRACHAIN_CONSOLE_SOURCES
     headers/console/console_manager.h
     headers/console/push_manager.h
     headers/console/console_input.h
+    headers/console/restapi_manager.h
+
     sources/console/console_manager.cpp
     sources/console/push_manager.cpp
     sources/console/console_input.cpp
+    sources/console/restapi_manager.cpp
     main.cpp
     )
 
