@@ -179,6 +179,15 @@ void ConsoleManager::commandReceiver(QString command) {
                     }
                 }
             }
+
+            if (list[1] == "check_balance") {
+                const auto actors = node->actorIndex()->allActorsStd();
+                for (int i = 0; i < actors.size(); i++) {
+                    const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), ActorId());
+                    std::cout << "[Actor: " << actors[i].c_str() << "] | ["
+                              << "Balance: " << balance << "]" << std::endl;
+                }
+            }
         }
     }
 
@@ -194,8 +203,8 @@ void ConsoleManager::commandReceiver(QString command) {
         std::filesystem::path filepath(file);
         qInfo() << "Adding file to DFS:" << command.mid(8).data();
 
-        auto result = node->dfs()->addLocalFile(node->accountController()->mainActor(), file, filepath.filename().string(),
-                                  DFS::Encryption::Public);
+        auto result = node->dfs()->addLocalFile(node->accountController()->mainActor(), file,
+                                                filepath.filename().string(), DFS::Encryption::Public);
         auto res = QString::fromStdString(result);
         if (res.left(5) == "Error") {
             qDebug() << res;
@@ -231,6 +240,28 @@ void ConsoleManager::commandReceiver(QString command) {
         if (file.write(data.toUtf8()) > 1)
             qInfo() << "Exported to" << fileName;
         file.close();
+    }
+
+    if (command.left(16) == "list_user_files ") {
+        auto userId = command.split(" ")[1];
+        qInfo() << "show list user " << userId << " files";
+        std::filesystem::path actorFolderPath = DFSB::fsActrRoot + "/" + userId.toStdString();
+        std::cout << "======================================================" << std::endl;
+
+        for (const auto &entry : std::filesystem::recursive_directory_iterator(actorFolderPath)) {
+            const auto fileName = entry.path().filename();
+            if (fileName == "." || fileName == ".." || fileName == ".dir" || fileName == ".DS_Store")
+                continue;
+
+            if (!std::filesystem::is_directory(entry)) {
+                const std::string filePath =
+                    actorFolderPath.string() + "/" + entry.path().filename().string();
+                std::cout << entry.path() << std::endl;
+            } else {
+                std::cout << "------------------------------------------------------" << std::endl;
+            }
+        }
+        std::cout << "======================================================" << std::endl;
     }
 }
 
