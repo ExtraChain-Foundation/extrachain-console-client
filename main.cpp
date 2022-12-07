@@ -40,11 +40,11 @@ int main(int argc, char* argv[]) {
     QCommandLineOption emailOption({ "e", "email" }, "Set email", "email");
     QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
-    QCommandLineOption createNetworkOption("create-network", "First network creation");
+    QCommandLineOption core("core", "First network creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption("dfs-limit", "Temp", "dfs-limit");
-    parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, createNetworkOption,
+    parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, core,
                         clearDataOption, importOption, netdebOption, dfsLimitOption });
     parser.process(app);
 
@@ -58,15 +58,15 @@ int main(int argc, char* argv[]) {
         Utils::wipeDataFiles();
     }
 
-    QLockFile lockFile(".console.lock");
-    if (!lockFile.tryLock(100)) {
-        if (!QFile::exists(".console.lock")) {
-            qDebug() << "[Console] Unable to write files. Check folder permissions";
-            return -1;
-        }
-        qDebug() << "[Console] Already running in directory" << QDir::currentPath();
-        return -1;
-    }
+//    QLockFile lockFile(".console.lock");
+//    if (!lockFile.tryLock(100)) {
+//        if (!QFile::exists(".console.lock")) {
+//            qDebug() << "[Console] Unable to write files. Check folder permissions";
+//            return -1;
+//        }
+//        qDebug() << "[Console] Already running in directory" << QDir::currentPath();
+//        return -1;
+//    }
 
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     qInfo() << "";
     qDebug() << "[Console] Debug logs on";
 
-    bool isNewNetwork = parser.isSet(createNetworkOption);
+    bool isNewNetwork = parser.isSet(core);
     ConsoleManager console;
     if (!dirName.isEmpty())
         qDebug() << "Custom data directory:" << dirName;
