@@ -36,27 +36,27 @@ void ConsoleManager::commandReceiver(QString command) {
     qDebug() << "[Console] Input:" << command;
 
     // TODO: process coin request
-    //    if (node->listenCoinRequest())
-    //    {
-    //        auto &requestQueue = node->requestCoinQueue();
-    //        auto request = requestQueue.takeFirst();
+//    if (node->listenCoinRequest())
+//    {
+//        auto &requestQueue = node->requestCoinQueue();
+//        auto request = requestQueue.takeFirst();
 
-    //        if (command == "y")
-    //        {
-    //            auto [receiver, amount, plsr] = request;
-    //            node->sendCoinRequest(receiver, amount);
-    //        }
+//        if (command == "y")
+//        {
+//            auto [receiver, amount, plsr] = request;
+//            node->sendCoinRequest(receiver, amount);
+//        }
 
-    //        node->setListenCoinRequest(false);
-    //        if (requestQueue.length() > 0)
-    //        {
-    //            request = requestQueue.takeFirst();
-    //            auto [receiver, amount, plsr] = request;
-    //            node->coinResponse(receiver, amount, plsr);
-    //        }
+//        node->setListenCoinRequest(false);
+//        if (requestQueue.length() > 0)
+//        {
+//            request = requestQueue.takeFirst();
+//            auto [receiver, amount, plsr] = request;
+//            node->coinResponse(receiver, amount, plsr);
+//        }
 
-    //        return;
-    //    }
+//        return;
+//    }
 
     if (command == "quit" || command == "exit") {
         qInfo() << "Exit...";
@@ -262,6 +262,14 @@ void ConsoleManager::commandReceiver(QString command) {
             }
         }
         std::cout << "======================================================" << std::endl;
+    }
+    //request_coins coins
+    if (command.left(13) == "request_coins") {
+        auto actorId = node->accountController()->mainActor().id();
+        auto coins = command.split(" ")[1];
+
+        qInfo() << "Request coins: " << coins << "for " << actorId.toString();
+        node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 
