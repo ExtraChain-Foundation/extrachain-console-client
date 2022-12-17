@@ -113,7 +113,7 @@ void ConsoleManager::commandReceiver(QString command) {
             qDebug() << "sendtx" << toId << toAmount;
 
             ActorId receiver(toId.toStdString());
-            BigNumber amount = Transaction::visibleToAmount(toAmount);
+            BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
             if (mainActorId != firstId)
                 node->createTransaction(receiver, amount, ActorId());
@@ -262,6 +262,14 @@ void ConsoleManager::commandReceiver(QString command) {
             }
         }
         std::cout << "======================================================" << std::endl;
+    }
+    // request_coins coins
+    if (command.left(13) == "request_coins") {
+        auto actorId = node->accountController()->mainActor().id();
+        auto coins = command.split(" ")[1];
+
+        qInfo() << "Request coins: " << coins << "for " << actorId.toString();
+        node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 
