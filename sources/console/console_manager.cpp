@@ -113,7 +113,7 @@ void ConsoleManager::commandReceiver(QString command) {
             qDebug() << "sendtx" << toId << toAmount;
 
             ActorId receiver(toId.toStdString());
-            BigNumber amount = Transaction::visibleToAmount(toAmount.toStdString());
+            BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
             if (mainActorId != firstId)
                 node->createTransaction(receiver, amount, ActorId());
