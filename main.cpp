@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption core("core", "First network creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
-    QCommandLineOption dfsLimitOption("dfs-limit", "Temp", "dfs-limit");
+    QCommandLineOption dfsLimitOption({"l", "limit"}, "Set limit", "dfs-limit");
     parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, core,
                         clearDataOption, importOption, netdebOption, dfsLimitOption });
     parser.process(app);
