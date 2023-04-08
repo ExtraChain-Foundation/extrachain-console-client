@@ -114,12 +114,20 @@ void ConsoleManager::commandReceiver(QString command) {
             qDebug() << "sendtx" << toId << toAmount;
 
             ActorId receiver(toId.toStdString());
-            BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
-            if (mainActorId != firstId)
-                node->createTransaction(receiver, amount, ActorId());
-            else
-                node->createTransactionFrom(firstId, receiver, amount, ActorId());
+            BigNumberFloat amount(toAmount.toStdString());
+            if(toId == "burn") {
+                receiver = ActorId();
+            }
+
+            Transaction tx(mainActorId, receiver, amount);
+            node->txManager()->addTransaction(tx);
+            node->network()->send_message(tx, MessageType::BlockchainTransaction);
+
+//            if (mainActorId != firstId)
+//            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
+//            else
+//                node->createTransactionFrom(firstId, receiver, BigNumberFloat(10), ActorId());
         }
     }
 
