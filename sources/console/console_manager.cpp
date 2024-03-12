@@ -9,6 +9,7 @@
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
+#include "datastorage/blockchain.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -269,7 +270,7 @@ void ConsoleManager::commandReceiver(QString command) {
         auto coins = command.split(" ")[1];
 
         qInfo() << "Request coins: " << coins << "for " << actorId.toString();
-        node->blockchain()->sendCoinReward(actorId, coins.toInt());
+        //node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 
