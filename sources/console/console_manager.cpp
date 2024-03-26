@@ -278,7 +278,7 @@ void ConsoleManager::commandReceiver(QString command) {
         auto coins = command.split(" ")[1];
 
         qInfo() << "Request coins: " << coins << "for " << actorId.toString();
-        node->blockchain()->sendCoinReward(actorId, coins.toInt());
+        //node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 
