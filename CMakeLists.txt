@@ -6,6 +6,13 @@ project(extrachain-console LANGUAGES C CXX VERSION ${EXTRACHAIN_VERSION})
 set(EXTRACHAIN_STATIC_BUILD true)
 include(../extrachain-core/CMakeLists.txt)
 
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
+)
+FetchContent_MakeAvailable(googletest)
+
 set(EXTRACHAIN_CONSOLE_SOURCES
     headers/console/console_manager.h
     headers/console/push_manager.h
@@ -38,3 +45,6 @@ target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extracha
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+enable_testing()
+add_subdirectory(Units)
