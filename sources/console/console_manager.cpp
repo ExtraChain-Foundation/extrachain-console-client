@@ -10,6 +10,7 @@
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
 #include "datastorage/blockchain.h"
+#include "managers/tx_manager.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
