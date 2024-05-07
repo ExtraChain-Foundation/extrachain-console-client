@@ -115,7 +115,9 @@ void ConsoleManager::commandReceiver(QString command) {
 
             ActorId receiver(toId.toStdString());
 
-            BigNumberFloat amount(toAmount.toStdString());
+            BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
+
+            // BigNumberFloat amount(toAmount.toStdString());
             if(toId == "burn") {
                 receiver = ActorId();
             }
