@@ -3,33 +3,35 @@ cmake_minimum_required(VERSION 3.20)
 file(STRINGS "../extrachain-core/extrachain_version" EXTRACHAIN_VERSION)
 project(extrachain-console LANGUAGES C CXX VERSION ${EXTRACHAIN_VERSION})
 
+set(CMAKE_CXX_STANDARD 23)
+
 set(EXTRACHAIN_STATIC_BUILD true)
 include(../extrachain-core/CMakeLists.txt)
 
 include(FetchContent)
 FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
+        googletest
+        URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
 )
 FetchContent_MakeAvailable(googletest)
 
 set(EXTRACHAIN_CONSOLE_SOURCES
-    headers/console/console_manager.h
-    headers/console/push_manager.h
-    headers/console/console_input.h
-    sources/console/console_manager.cpp
-    sources/console/push_manager.cpp
-    sources/console/console_input.cpp
-    main.cpp
-    )
+        headers/console/console_manager.h
+        headers/console/push_manager.h
+        headers/console/console_input.h
+        sources/console/console_manager.cpp
+        sources/console/push_manager.cpp
+        sources/console/console_input.cpp
+        main.cpp
+)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Library)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Library)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Build)
 
 add_executable(extrachain-console
-    ${EXTRACHAIN_CONSOLE_SOURCES}
-    )
+        ${EXTRACHAIN_CONSOLE_SOURCES}
+)
 
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
@@ -40,7 +42,7 @@ string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
 string(STRIP "${GIT_BRANCH}" GIT_BRANCH)
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain)
+target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain stdc++exp backtrace)
 
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
 

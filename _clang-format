@@ -34,7 +34,7 @@ AllowShortEnumsOnASingleLine: false
 SortIncludes: true
 SortUsingDeclarations: true
 AlignTrailingComments: true
-AllowShortFunctionsOnASingleLine: None
+#AllowShortFunctionsOnASingleLine: None
 SpaceBeforeParens: ControlStatements
 DerivePointerAlignment: true
 IndentPPDirectives: BeforeHash
