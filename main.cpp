@@ -41,9 +41,9 @@ const char* strsignal(int sig) {
 static void HandleSignal(int sig) {
     try {
         switch (sig) {
-#ifdef Q_OS_LINUX
+            #ifdef Q_OS_LINUX
         case SIGQUIT:
-#endif
+            #endif
         case SIGINT:
         case SIGTERM: {
             qCritical() << "Signal achieved: " << strsignal(sig);
@@ -53,7 +53,7 @@ static void HandleSignal(int sig) {
         case SIGABRT:
         case SIGSEGV: {
             qCritical() << "Catch signal: " << strsignal(sig);
-#ifdef Q_OS_WIN
+            #ifdef Q_OS_WIN
             //TODO: need to test this logic on Windows
             constexpr int maxFrames = 64;
             void* stackTrace[maxFrames];
@@ -67,16 +67,16 @@ static void HandleSignal(int sig) {
                 qInfo() << "#" << i << ": " << symbol->Name << " - 0x" << std::hex << stackTrace[i];
             }
             free(symbol);
-#elif defined(Q_OS_LINUX)
-            void* stackTrace[64];
-            int frameCount = backtrace(stackTrace, 64);
-            char** symbols = backtrace_symbols(stackTrace, frameCount);
+            #elif defined(Q_OS_LINUX)
+            void * stackTrace[64];
+            int    frameCount = backtrace(stackTrace, 64);
+            char **symbols    = backtrace_symbols(stackTrace, frameCount);
             if (symbols != nullptr) {
                 for (int i = 0; i < frameCount; ++i)
                     qInfo() << "#" << i << ": " << symbols[i];
                 free(symbols);
             }
-#endif
+            #endif
 
             if (sig == SIGSEGV)
                 _exit(EXIT_FAILURE);
@@ -86,23 +86,23 @@ static void HandleSignal(int sig) {
         default:
             exit(EXIT_FAILURE);
         }
-    } catch (const std::exception& ex) {
+    } catch (const std::exception &ex) {
         qCritical() << "SignalHandler exception: " << ex.what();
         _exit(EXIT_FAILURE);
     }
 }
 
 bool SetupSignals() {
-#ifdef Q_OS_WIN
+    #ifdef Q_OS_WIN
     constexpr const std::array<int, 4> arrSig = { { SIGINT, SIGTERM, SIGSEGV, SIGABRT } };
-#else
+    #else
     constexpr const std::array<int, 5> arrSig = { { SIGINT, SIGTERM, SIGSEGV, SIGABRT, SIGQUIT } };
-#endif
+    #endif
 
-    for (const auto& item : arrSig) {
+    for (const auto &item : arrSig) {
         if (signal(item, HandleSignal) == SIG_ERR) {
             qCritical() << "Cannot handle a signal: " + QString::fromStdString(strsignal(item))
-                    + ", reason - " + QString::fromStdString(strerror(errno));
+                + ", reason - " + QString::fromStdString(strerror(errno));
             return false;
         }
     }
@@ -110,7 +110,7 @@ bool SetupSignals() {
     return true;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
 
     app.setApplicationName("ExtraChain Console Client");
@@ -142,8 +142,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption vpnServer("vpn-server", "Start VPN server");
-    parser.addOptions({ debugOption, dirOption, emailOption, passOption, inputOption, core, clearDataOption,
-                        importOption, netdebOption, dfsLimitOption, vpnServer });
+    parser.addOptions(
+    { debugOption, dirOption, emailOption, passOption, inputOption, core, clearDataOption,
+      importOption, netdebOption, dfsLimitOption, vpnServer });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -167,28 +168,28 @@ int main(int argc, char* argv[]) {
     //    }
 
     LogsManager::debugLogs = parser.isSet(debugOption);
-#ifdef QT_DEBUG
+    #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
-    Network::networkDebug = parser.isSet(netdebOption);
-#endif
+    Network::networkDebug  = parser.isSet(netdebOption);
+    #endif
 
     qInfo() << " ┌───────────────────────────────────────────┐";
     qInfo().nospace() << " │            ExtraChain " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
-                      << "         │";
+        << "         │";
     if (LogsManager::debugLogs)
         qInfo() << " │     Console:" << GIT_COMMIT << "| Core:" << GIT_COMMIT_CORE << "     │";
     qInfo() << " └───────────────────────────────────────────┘";
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
-                                << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
-                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
+        << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
+        << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
     qInfo() << "";
     qDebug() << "[Console] Debug logs on";
 
-    bool isNewNetwork = parser.isSet(core);
+    bool           isNewNetwork = parser.isSet(core);
     ConsoleManager console;
     if (!dirName.isEmpty())
         qDebug() << "Custom data directory:" << dirName;
@@ -196,14 +197,14 @@ int main(int argc, char* argv[]) {
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argEmail = parser.value(emailOption);
+    QString argEmail    = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
-    QString email = argEmail.isEmpty() && !AutologinHash::isAvailable()
-        ? ConsoleManager::getSomething("e-mail")
-        : argEmail;
+    QString email       = argEmail.isEmpty() && !AutologinHash::isAvailable()
+                        ? ConsoleManager::getSomething("e-mail")
+                        : argEmail;
     QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
-        ? ConsoleManager::getSomething("password")
-        : argPassword;
+                           ? ConsoleManager::getSomething("password")
+                           : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
@@ -217,7 +218,7 @@ int main(int argc, char* argv[]) {
 
     QString dfsLimit = parser.value(dfsLimitOption);
     if (!dfsLimit.isEmpty()) {
-        bool isOk = false;
+        bool    isOk  = false;
         quint64 limit = dfsLimit.toULongLong(&isOk);
         if (isOk) {
             node.dfs()->setBytesLimit(limit);
@@ -241,7 +242,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (node.accountController()->count() == 0) {
-        std::string loginHash;
+        std::string   loginHash;
         AutologinHash autologinHash;
         if (AutologinHash::isAvailable() && autologinHash.load()) {
             loginHash = autologinHash.hash();
