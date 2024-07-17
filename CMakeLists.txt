@@ -40,7 +40,7 @@ string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
 string(STRIP "${GIT_BRANCH}" GIT_BRANCH)
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain stdc++exp backtrace)
+target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain)
 
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
 
