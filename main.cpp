@@ -260,8 +260,8 @@ int main(int argc, char *argv[]) {
             std::exit(-1);
         }
     } else if (node.accountController()->count() > 0) {
-        if (parser.isSet(vpnServer))
-            node.createVPNKeys();
+        // if (parser.isSet(vpnServer))
+            // node.createVPNKeys();
     }
 
     return app.exec();
