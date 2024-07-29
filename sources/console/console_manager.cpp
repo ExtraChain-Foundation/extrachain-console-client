@@ -37,28 +37,28 @@ void ConsoleManager::commandReceiver(QString command) {
     command = command.simplified();
     qDebug() << "[Console] Input:" << command;
 
-    // TODO: process coin request
-    //    if (node->listenCoinRequest())
-    //    {
-    //        auto &requestQueue = node->requestCoinQueue();
-    //        auto request = requestQueue.takeFirst();
+           // TODO: process coin request
+           //    if (node->listenCoinRequest())
+           //    {
+           //        auto &requestQueue = node->requestCoinQueue();
+           //        auto request = requestQueue.takeFirst();
 
-    //        if (command == "y")
-    //        {
-    //            auto [receiver, amount, plsr] = request;
-    //            node->sendCoinRequest(receiver, amount);
-    //        }
+           //        if (command == "y")
+           //        {
+           //            auto [receiver, amount, plsr] = request;
+           //            node->sendCoinRequest(receiver, amount);
+           //        }
 
-    //        node->setListenCoinRequest(false);
-    //        if (requestQueue.length() > 0)
-    //        {
-    //            request = requestQueue.takeFirst();
-    //            auto [receiver, amount, plsr] = request;
-    //            node->coinResponse(receiver, amount, plsr);
-    //        }
+           //        node->setListenCoinRequest(false);
+           //        if (requestQueue.length() > 0)
+           //        {
+           //            request = requestQueue.takeFirst();
+           //            auto [receiver, amount, plsr] = request;
+           //            node->coinResponse(receiver, amount, plsr);
+           //        }
 
-    //        return;
-    //    }
+           //        return;
+           //    }
 
     if (command == "quit" || command == "exit") {
         qInfo() << "Exit...";
@@ -105,7 +105,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "sendtx") {
         qDebug() << "sendtx";
-        auto mainActorId = node->accountController()->mainActor().id();
+        auto mainActorId = node->accountController()->mainActor()->id();
         ActorId firstId = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");
@@ -118,7 +118,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
             BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
-            // BigNumberFloat amount(toAmount.toStdString());
+                   // BigNumberFloat amount(toAmount.toStdString());
             if(toId == "burn") {
                 receiver = ActorId();
             }
@@ -127,10 +127,10 @@ void ConsoleManager::commandReceiver(QString command) {
             node->txManager()->addTransaction(tx);
             node->network()->send_message(tx, MessageType::BlockchainTransaction);
 
-//            if (mainActorId != firstId)
-//            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
-//            else
-//                node->createTransactionFrom(firstId, receiver, BigNumberFloat(10), ActorId());
+            //            if (mainActorId != firstId)
+            //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
+            //            else
+            //                node->createTransactionFrom(firstId, receiver, BigNumberFloat(10), ActorId());
         }
     }
 
@@ -183,21 +183,46 @@ void ConsoleManager::commandReceiver(QString command) {
             if (list[1] == "list") {
                 qInfo() << "Wallets:";
                 auto actors = node->accountController()->accounts();
-                auto mainId = node->accountController()->mainActor().id();
+                auto mainId = node->accountController()->mainActor()->id();
                 qInfo() << "User" << mainId;
                 for (const auto &actor : actors) {
-                    if (actor.id() != node->accountController()->mainActor().id()) {
-                        qInfo() << "Wallet" << actor.id();
+                    if (actor->id() != node->accountController()->mainActor()->id()) {
+                        qInfo() << "Wallet" << actor->id();
                     }
                 }
             }
 
             if (list[1] == "check_balance") {
                 const auto actors = node->actorIndex()->allActorsStd();
-                for (int i = 0; i < actors.size(); i++) {
-                    const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), ActorId());
-                    std::cout << "[Actor: " << actors[i].c_str() << "] | ["
-                              << "Balance: " << balance << "]" << std::endl;
+                ActorId token;
+                if(list.size() > 2) {
+                    auto param = list[2].toStdString();
+
+                    if(param != "all") {
+                        token = ActorId(param);
+                        for (int i = 0; i < actors.size(); i++) {
+                            const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), token);
+                            std::cout << "[Actor: " << actors[i].c_str() << "] | ["
+                                      << "Balance: " << balance << "]" << std::endl;
+                        }
+                    } else {
+                        std::vector<std::string> tokens = {Token::EXTRACHAIN_TOKEN, Token::ROCC_TOKEN};
+                        for(auto &token : tokens) {
+                            std::cout << "------" << (token.empty() ? "ECH" : token) << "------" << std::endl;;
+                            for (int i = 0; i < actors.size(); i++) {
+                                const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), token).toStdString();
+                                std::cout << fmt::format("Actor: {} | Token: {} | Balance: {}", actors[i].c_str(), token, balance) << std::endl;
+                            }
+                            std::cout << "------END------" << std::endl << std::endl;;
+                        }
+                    }
+
+                } else {
+                    for (int i = 0; i < actors.size(); i++) {
+                        const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), token);
+                        std::cout << "[Actor: " << actors[i].c_str() << "] | ["
+                                  << "Balance: " << balance << "]" << std::endl;
+                    }
                 }
             }
         }
@@ -246,7 +271,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(6) == "export") {
         auto data = QString::fromStdString(node->exportUser());
         QString fileName =
-            QString("%1.extrachain").arg(node->accountController()->mainActor().id().toString());
+            QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toString());
         QFile file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)
@@ -277,7 +302,7 @@ void ConsoleManager::commandReceiver(QString command) {
     }
     // request_coins coins
     if (command.left(13) == "request_coins") {
-        auto actorId = node->accountController()->mainActor().id();
+        auto actorId = node->accountController()->mainActor()->id();
         auto coins = command.split(" ")[1];
 
         qInfo() << "Request coins: " << coins << "for " << actorId.toString();
@@ -292,7 +317,7 @@ PushManager *ConsoleManager::pushManager() const {
 void ConsoleManager::setExtraChainNode(ExtraChainNode *value) {
     node = value;
 
-    // auto dfs = node->dfs();
+           // auto dfs = node->dfs();
     connect(node, &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);
     // connect(dfs, &Dfs::chatMessage, m_pushManager, &PushManager::chatMessage);
     // connect(dfs, &Dfs::fileAdded, m_pushManager, &PushManager::fileAdded);
