@@ -307,6 +307,15 @@ void ConsoleManager::startInput() {
         return;
     }
 
+    #ifdef Q_OS_WINDOWS
+    DWORD consoleMode;
+    bool isInteractive = GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &consoleMode);
+    if (!isInteractive) {
+        qDebug() << "[Console] Console is not interactive, command input is disabled";
+        return;
+    }
+    #endif
+
     connect(&consoleInput, &ConsoleInput::input, this, &ConsoleManager::commandReceiver);
     ThreadPool::addThread(&consoleInput);
 #elif defined(Q_OS_UNIX)
