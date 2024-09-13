@@ -2,13 +2,13 @@
 
 ## Software stack
 
-* Qt 6.3+
+* Qt 6.7+
 * CMake 3.21+
 * vcpkg
 * Compilers:
-  * Windows: MSVC 2019 or MSVC/Clang 11+
-  * Ubuntu: Clang 11+ or GCC 11+
-  * Android: NDK 22 (Clang 11)
+  * Windows: MSVC or MSVC/Clang
+  * Ubuntu: Clang or GCC
+  * Android: NDK (Clang)
   * MacOS or iOS: Apple Clang
 
 ## Installation
@@ -42,7 +42,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision fmt magic-enum --triplet x64-windows
+    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library --triplet x64-windows
 
 and install integrate:
 
@@ -50,7 +50,7 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision fmt magic-enum
+    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library
 
 If Linux ARM, before:
 
