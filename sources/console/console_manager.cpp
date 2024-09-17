@@ -192,7 +192,7 @@ void ConsoleManager::commandReceiver(QString command) {
                 }
             }
 
-            if (list[1] == "check_balance") {
+            if (list[1] == "balance" || list[1] == "check_balance") {
                 const auto actors = node->actorIndex()->allActorsStd();
                 for (int i = 0; i < actors.size(); i++) {
                     const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), ActorId());

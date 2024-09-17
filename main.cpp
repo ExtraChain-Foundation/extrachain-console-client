@@ -1,8 +1,3 @@
-#ifdef Q_OS_WIN
-    #include <DbgHelp.h>
-    #include <Windows.h>
-#endif
-
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDebug>
@@ -12,13 +7,22 @@
 #include <QStandardPaths>
 
 #include <csignal>
-#include <execinfo.h>
 
 #include "console/console_manager.h"
 #include "datastorage/dfs/dfs_controller.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "metatypes.h"
+
+#ifdef Q_OS_LINUX
+    #include <execinfo.h>
+#endif
+
+#ifdef Q_OS_WINDOWS
+    #include <windows.h>
+    #include <dbghelp.h>
+    #pragma comment(lib, "dbghelp.lib")
+#endif
 
 #ifndef EXTRACHAIN_CMAKE
     #include "preconfig.h"
@@ -53,20 +57,46 @@ static void HandleSignal(int sig) {
         case SIGABRT:
         case SIGSEGV: {
             qCritical() << "Catch signal: " << strsignal(sig);
-            #ifdef Q_OS_WIN
-            //TODO: need to test this logic on Windows
-            constexpr int maxFrames = 64;
-            void* stackTrace[maxFrames];
-            USHORT frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
-            SYMBOL_INFO* symbol = (SYMBOL_INFO*)malloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char));
-            symbol->MaxNameLen = 255;
-            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+#ifdef Q_OS_WIN
+            SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_DEBUG);
+            if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
+                qCritical() << "Failed to initialize symbol handler. Error:" << GetLastError();
+            } else {
+                constexpr int maxFrames = 64;
+                void* stackTrace[maxFrames];
+                WORD frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
+                SYMBOL_INFO* symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
+                symbol->MaxNameLen = 255;
+                symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+                IMAGEHLP_LINE64 line;
+                line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
 
-            for (USHORT i = 0; i < frames; ++i) {
-                SymFromAddr(GetCurrentProcess(), (DWORD64)(stackTrace[i]), 0, symbol);
-                qInfo() << "#" << i << ": " << symbol->Name << " - 0x" << std::hex << stackTrace[i];
+                for (WORD i = 0; i < frames; i++) {
+                    DWORD64 address = (DWORD64)(stackTrace[i]);
+                    DWORD displacement;
+                    if (SymFromAddr(GetCurrentProcess(), address, 0, symbol)) {
+                        if (SymGetLineFromAddr64(GetCurrentProcess(), address, &displacement, &line)) {
+                            qInfo() << QString("#%1: %2 in %3 : line %4")
+                                           .arg(i)
+                                           .arg(symbol->Name)
+                                           .arg(line.FileName)
+                                           .arg(line.LineNumber);
+                        } else {
+                            qInfo() << QString("#%1: %2 - 0x%3 (Failed to get line info, error: %4)")
+                                           .arg(i)
+                                           .arg(symbol->Name)
+                                           .arg(QString::number(address, 16))
+                                           .arg(GetLastError());
+                        }
+                    } else {
+                        qInfo() << QString("#%1: 0x%2 (Failed to get symbol, error: %3)")
+                                       .arg(i)
+                                       .arg(QString::number(address, 16))
+                                       .arg(GetLastError());
+                    }
+                }
+                free(symbol);
             }
-            free(symbol);
             #elif defined(Q_OS_LINUX)
             void * stackTrace[64];
             int    frameCount = backtrace(stackTrace, 64);
@@ -142,9 +172,10 @@ int main(int argc, char *argv[]) {
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption vpnServer("vpn-server", "Start VPN server");
+    QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     parser.addOptions(
     { debugOption, dirOption, emailOption, passOption, inputOption, core, clearDataOption,
-      importOption, netdebOption, dfsLimitOption, vpnServer });
+      importOption, netdebOption, dfsLimitOption, vpnServer, blockDisableCompress });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -213,6 +244,7 @@ int main(int argc, char *argv[]) {
         console.startInput();
 
     ExtraChainNode node;
+    node.blockchain()->getBlockIndex().setBlockCompress(!parser.isSet(blockDisableCompress));
     console.setExtraChainNode(&node);
     console.dfsStart();
 
