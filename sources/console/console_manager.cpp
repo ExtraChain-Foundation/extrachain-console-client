@@ -105,7 +105,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "sendtx") {
         qDebug() << "sendtx";
-        auto mainActorId = node->accountController()->mainActor().id();
+        auto mainActorId = node->accountController()->mainActor()->id();
         ActorId firstId = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");
@@ -119,7 +119,7 @@ void ConsoleManager::commandReceiver(QString command) {
             BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
             // BigNumberFloat amount(toAmount.toStdString());
-            if(toId == "burn") {
+            if (toId == "burn") {
                 receiver = ActorId();
             }
 
@@ -183,11 +183,11 @@ void ConsoleManager::commandReceiver(QString command) {
             if (list[1] == "list") {
                 qInfo() << "Wallets:";
                 auto actors = node->accountController()->accounts();
-                auto mainId = node->accountController()->mainActor().id();
+                auto mainId = node->accountController()->mainActor()->id();
                 qInfo() << "User" << mainId;
                 for (const auto &actor : actors) {
-                    if (actor.id() != node->accountController()->mainActor().id()) {
-                        qInfo() << "Wallet" << actor.id();
+                    if (actor->id() != node->accountController()->mainActor()->id()) {
+                        qInfo() << "Wallet" << actor->id();
                     }
                 }
             }
@@ -246,7 +246,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(6) == "export") {
         auto data = QString::fromStdString(node->exportUser());
         QString fileName =
-            QString("%1.extrachain").arg(node->accountController()->mainActor().id().toString());
+            QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toString());
         QFile file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)
@@ -277,11 +277,11 @@ void ConsoleManager::commandReceiver(QString command) {
     }
     // request_coins coins
     if (command.left(13) == "request_coins") {
-        auto actorId = node->accountController()->mainActor().id();
+        auto actorId = node->accountController()->mainActor()->id();
         auto coins = command.split(" ")[1];
 
         qInfo() << "Request coins: " << coins << "for " << actorId.toString();
-        //node->blockchain()->sendCoinReward(actorId, coins.toInt());
+        // node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 

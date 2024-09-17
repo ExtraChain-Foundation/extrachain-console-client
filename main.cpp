@@ -171,11 +171,10 @@ int main(int argc, char *argv[]) {
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
-    QCommandLineOption vpnServer("vpn-server", "Start VPN server");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     parser.addOptions(
     { debugOption, dirOption, emailOption, passOption, inputOption, core, clearDataOption,
-      importOption, netdebOption, dfsLimitOption, vpnServer, blockDisableCompress });
+      importOption, netdebOption, dfsLimitOption, blockDisableCompress });
     parser.process(app);
 
     // TODO: allow absolute dir
@@ -199,10 +198,10 @@ int main(int argc, char *argv[]) {
     //    }
 
     LogsManager::debugLogs = parser.isSet(debugOption);
-    #ifdef QT_DEBUG
+#ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
-    Network::networkDebug  = parser.isSet(netdebOption);
-    #endif
+    Network::networkDebug = parser.isSet(netdebOption);
+#endif
 
     qInfo() << " ┌───────────────────────────────────────────┐";
     qInfo().nospace() << " │            ExtraChain " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
@@ -244,7 +243,11 @@ int main(int argc, char *argv[]) {
         console.startInput();
 
     ExtraChainNode node;
-    node.blockchain()->getBlockIndex().setBlockCompress(!parser.isSet(blockDisableCompress));
+
+    if (parser.isSet(blockDisableCompress)) {
+        node.blockchain()->getBlockIndex().setBlockCompress(false);
+    }
+
     console.setExtraChainNode(&node);
     console.dfsStart();
 
@@ -291,9 +294,6 @@ int main(int argc, char *argv[]) {
                 qInfo() << "Error: No profiles files";
             std::exit(-1);
         }
-    } else if (node.accountController()->count() > 0) {
-        if (parser.isSet(vpnServer))
-            node.createVPNKeys();
     }
 
     return app.exec();
