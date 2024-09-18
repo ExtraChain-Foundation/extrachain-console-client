@@ -21,9 +21,10 @@ Clone:
 
 2. Install some dependencies:
 
-For Ubuntu 22.04:
+For Ubuntu 24.04:
 
-    sudo apt install curl zip unzip tar
+    sudo apt install git curl zip unzip tar pkg-config autoconf libtool
+    sudo snap install cmake
     bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
 3. And install vcpkg:
@@ -42,7 +43,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library --triplet x64-windows
+    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library cpp-base64 --triplet x64-windows
 
 and install integrate:
 
@@ -50,7 +51,7 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library
+    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library cpp-base64
 
 If Linux ARM, before:
 
