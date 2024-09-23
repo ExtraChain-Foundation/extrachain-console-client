@@ -111,12 +111,10 @@ void ConsoleManager::commandReceiver(QString command) {
         QStringList sendtx = command.split(" ");
         if (sendtx.length() == 3) {
             QByteArray toId = sendtx[1].toUtf8();
-            QByteArray toAmount = sendtx[2].toUtf8();
-            qDebug() << "sendtx" << toId << toAmount;
+            BigNumberFloat amount = sendtx[2].toStdString();
+            qDebug() << "sendtx" << toId << amount.toStdString(NumeralBase::Dec);
 
             ActorId receiver(toId.toStdString());
-
-            BigNumberFloat amount = Transaction::visibleToAmount(toAmount.toStdString());
 
             // BigNumberFloat amount(toAmount.toStdString());
             if (toId == "burn") {
