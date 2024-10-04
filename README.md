@@ -2,13 +2,13 @@
 
 ## Software stack
 
-* Qt 6.7+
-* CMake 3.21+
+* Qt 6.7.3
+* CMake 3.29+
 * vcpkg
 * Compilers:
-  * Windows: MSVC or MSVC/Clang
-  * Ubuntu: Clang or GCC
-  * Android: NDK (Clang)
+  * Windows: MSVC 2022 or MSVC/Clang
+  * Ubuntu: Clang 16+ or GCC 13+
+  * Android: NDK 26 (Clang)
   * MacOS or iOS: Apple Clang
 
 ## Installation
@@ -23,8 +23,8 @@ Clone:
 
 For Ubuntu 24.04:
 
-    sudo apt install git curl zip unzip tar pkg-config autoconf libtool
-    sudo snap install cmake
+    sudo apt install make git curl zip unzip tar pkg-config autoconf libtool
+    sudo snap install cmake --classic
     bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
 3. And install vcpkg:

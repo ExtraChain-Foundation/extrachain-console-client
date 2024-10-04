@@ -10,7 +10,7 @@
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
 #include "datastorage/blockchain.h"
-#include "managers/tx_manager.h"
+#include "managers/transaction_manager.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -103,8 +103,8 @@ void ConsoleManager::commandReceiver(QString command) {
 #endif
     }
 
-    if (command.left(6) == "sendtx") {
-        qDebug() << "sendtx";
+    if (command.left(6) == "transaction") {
+        qDebug() << "[Console] 'transaction' command";
         auto mainActorId = node->accountController()->mainActor()->id();
         ActorId firstId = node->actorIndex()->firstId();
 
@@ -112,7 +112,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (sendtx.length() == 3) {
             QByteArray toId = sendtx[1].toUtf8();
             BigNumberFloat amount = sendtx[2].toStdString();
-            qDebug() << "sendtx" << toId << amount.toStdString(NumeralBase::Dec);
+            qDebug() << "transaction" << toId << amount.toStdString(NumeralBase::Dec);
 
             ActorId receiver(toId.toStdString());
 
@@ -122,7 +122,7 @@ void ConsoleManager::commandReceiver(QString command) {
             }
 
             Transaction tx(mainActorId, receiver, amount);
-            node->txManager()->addTransaction(tx);
+            // createTransaction
             node->network()->send_message(tx, MessageType::BlockchainTransaction);
 
 //            if (mainActorId != firstId)
@@ -299,20 +299,18 @@ void ConsoleManager::setExtraChainNode(ExtraChainNode *value) {
 }
 
 void ConsoleManager::startInput() {
-#if defined(Q_OS_WIN)
-    if (IsDebuggerPresent()) {
-        qDebug() << "[Console] Input off, because debugger mode";
-        return;
-    }
-
-    #ifdef Q_OS_WINDOWS
+#ifdef Q_OS_WINDOWS
     DWORD consoleMode;
     bool isInteractive = GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &consoleMode);
     if (!isInteractive) {
         qDebug() << "[Console] Console is not interactive, command input is disabled";
         return;
     }
-    #endif
+
+    // if (IsDebuggerPresent()) {
+    //     qDebug() << "[Console] Input off, because debugger mode";
+    //     return;
+    // }
 
     connect(&consoleInput, &ConsoleInput::input, this, &ConsoleManager::commandReceiver);
     ThreadPool::addThread(&consoleInput);
