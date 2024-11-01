@@ -8,10 +8,12 @@
 
 #include <csignal>
 
+#include "utils/exc_utils.h"
 #include "console/console_manager.h"
 #include "datastorage/dfs/dfs_controller.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
+#include "utils/exc_logs.h"
 #include "metatypes.h"
 
 #ifdef Q_OS_LINUX
@@ -30,9 +32,10 @@
 
 #ifdef Q_OS_WIN
 const char* strsignal(int sig) {
-    static const std::unordered_map<int, const char*> sig2NameMap = {
-        { SIGINT, "SIGINT" }, { SIGTERM, "SIGTERM" }, { SIGABRT, "SIGABRT" }, { SIGSEGV, "SIGSEGV" }
-    };
+    static const std::unordered_map<int, const char*> sig2NameMap = { { SIGINT, "SIGINT" },
+                                                                      { SIGTERM, "SIGTERM" },
+                                                                      { SIGABRT, "SIGABRT" },
+                                                                      { SIGSEGV, "SIGSEGV" } };
 
     const auto iter = sig2NameMap.find(sig);
     if (iter != sig2NameMap.end())
@@ -45,9 +48,9 @@ const char* strsignal(int sig) {
 static void HandleSignal(int sig) {
     try {
         switch (sig) {
-            #ifdef Q_OS_LINUX
+#ifdef Q_OS_LINUX
         case SIGQUIT:
-            #endif
+#endif
         case SIGINT:
         case SIGTERM: {
             qCritical() << "Signal achieved: " << strsignal(sig);
@@ -63,17 +66,17 @@ static void HandleSignal(int sig) {
                 qCritical() << "Failed to initialize symbol handler. Error:" << GetLastError();
             } else {
                 constexpr int maxFrames = 64;
-                void* stackTrace[maxFrames];
-                WORD frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
-                SYMBOL_INFO* symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
-                symbol->MaxNameLen = 255;
+                void*         stackTrace[maxFrames];
+                WORD          frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
+                SYMBOL_INFO*  symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
+                symbol->MaxNameLen   = 255;
                 symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
                 IMAGEHLP_LINE64 line;
                 line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
 
                 for (WORD i = 0; i < frames; i++) {
                     DWORD64 address = (DWORD64)(stackTrace[i]);
-                    DWORD displacement;
+                    DWORD   displacement;
                     if (SymFromAddr(GetCurrentProcess(), address, 0, symbol)) {
                         if (SymGetLineFromAddr64(GetCurrentProcess(), address, &displacement, &line)) {
                             qInfo() << QString("#%1: %2 in %3 : line %4")
@@ -97,16 +100,16 @@ static void HandleSignal(int sig) {
                 }
                 free(symbol);
             }
-            #elif defined(Q_OS_LINUX)
-            void * stackTrace[64];
+#elif defined(Q_OS_LINUX)
+            void*  stackTrace[64];
             int    frameCount = backtrace(stackTrace, 64);
-            char **symbols    = backtrace_symbols(stackTrace, frameCount);
+            char** symbols    = backtrace_symbols(stackTrace, frameCount);
             if (symbols != nullptr) {
                 for (int i = 0; i < frameCount; ++i)
                     qInfo() << "#" << i << ": " << symbols[i];
                 free(symbols);
             }
-            #endif
+#endif
 
             if (sig == SIGSEGV)
                 _exit(EXIT_FAILURE);
@@ -116,23 +119,23 @@ static void HandleSignal(int sig) {
         default:
             exit(EXIT_FAILURE);
         }
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         qCritical() << "SignalHandler exception: " << ex.what();
         _exit(EXIT_FAILURE);
     }
 }
 
 bool SetupSignals() {
-    #ifdef Q_OS_WIN
+#ifdef Q_OS_WIN
     constexpr const std::array<int, 4> arrSig = { { SIGINT, SIGTERM, SIGSEGV, SIGABRT } };
-    #else
+#else
     constexpr const std::array<int, 5> arrSig = { { SIGINT, SIGTERM, SIGSEGV, SIGABRT, SIGQUIT } };
-    #endif
+#endif
 
-    for (const auto &item : arrSig) {
+    for (const auto& item : arrSig) {
         if (signal(item, HandleSignal) == SIG_ERR) {
             qCritical() << "Cannot handle a signal: " + QString::fromStdString(strsignal(item))
-                + ", reason - " + QString::fromStdString(strerror(errno));
+                               + ", reason - " + QString::fromStdString(strerror(errno));
             return false;
         }
     }
@@ -140,7 +143,7 @@ bool SetupSignals() {
     return true;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
 
     app.setApplicationName("ExtraChain Console Client");
@@ -172,18 +175,26 @@ int main(int argc, char *argv[]) {
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
-    parser.addOptions(
-    { debugOption, dirOption, emailOption, passOption, inputOption, core, clearDataOption,
-      importOption, netdebOption, dfsLimitOption, blockDisableCompress });
+    parser.addOptions({ debugOption,
+                        dirOption,
+                        emailOption,
+                        passOption,
+                        inputOption,
+                        core,
+                        clearDataOption,
+                        importOption,
+                        netdebOption,
+                        dfsLimitOption,
+                        blockDisableCompress });
     parser.process(app);
 
-    // TODO: allow absolute dir
+    // TODO: allow absolute directory
     QString dirName = Utils::fixFileName(parser.value(dirOption), "");
     Utils::dataDir(dirName.isEmpty() ? "console-data" : dirName);
     QDir().mkdir(Utils::dataDir());
     QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
 
-    if (parser.isSet(clearDataOption)) {
+    if (parser.isSet(clearDataOption) || parser.isSet(core)) {
         Utils::wipeDataFiles();
     }
 
@@ -197,22 +208,26 @@ int main(int argc, char *argv[]) {
     //        return -1;
     //    }
 
+    Logger::instance().set_debug(true);
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
-    Network::networkDebug = parser.isSet(netdebOption);
+    Network::networkDebug  = parser.isSet(netdebOption);
+    qInfo() << "Debug logs enabled:" << LogsManager::debugLogs;
 #endif
+
+    LogsManager::onFile();
 
     qInfo() << " ┌───────────────────────────────────────────┐";
     qInfo().nospace() << " │            ExtraChain " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
-        << "         │";
+                      << "         │";
     if (LogsManager::debugLogs)
         qInfo() << " │     Console:" << GIT_COMMIT << "| Core:" << GIT_COMMIT_CORE << "     │";
     qInfo() << " └───────────────────────────────────────────┘";
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
-        << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
-        << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
+                                << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
+                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
@@ -230,11 +245,11 @@ int main(int argc, char *argv[]) {
     QString argEmail    = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
     QString email       = argEmail.isEmpty() && !AutologinHash::isAvailable()
-                        ? ConsoleManager::getSomething("e-mail")
-                        : argEmail;
-    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
-                           ? ConsoleManager::getSomething("password")
-                           : argPassword;
+                              ? ConsoleManager::getSomething("e-mail")
+                              : argEmail;
+    QString password    = argPassword.isEmpty() && !AutologinHash::isAvailable()
+                              ? ConsoleManager::getSomething("password")
+                              : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
@@ -242,59 +257,69 @@ int main(int argc, char *argv[]) {
     else
         console.startInput();
 
-    ExtraChainNode node;
+    ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app, false, false, true);
+    auto                   node        = nodeWrapper->node;
+    nodeWrapper->Init(true);
 
     if (parser.isSet(blockDisableCompress)) {
-        node.blockchain()->getBlockIndex().setBlockCompress(false);
+        node->blockchain()->getBlockIndex().setBlockCompress(false);
     }
 
-    console.setExtraChainNode(&node);
-    console.dfsStart();
+    QObject::connect(node, &ExtraChainNode::NodeInitialised, [&]() {
+        qDebug() << "[Console] Activated";
+        console.setExtraChainNode(node);
+        console.dfsStart();
 
-    QString dfsLimit = parser.value(dfsLimitOption);
-    if (!dfsLimit.isEmpty()) {
-        bool    isOk  = false;
-        quint64 limit = dfsLimit.toULongLong(&isOk);
-        if (isOk) {
-            node.dfs()->setBytesLimit(limit);
-        }
-    }
-
-    if (isNewNetwork)
-        node.createNewNetwork(email, password, "Some Coin", "1111", "#ffffff");
-
-    QString importFile = parser.value(importOption);
-    if (!importFile.isEmpty()) {
-        QFile file(importFile);
-        file.open(QFile::ReadOnly);
-        auto data = file.readAll().toStdString();
-        if (data.empty()) {
-            qInfo() << "Incorrect import";
-            std::exit(0);
-        }
-        node.importUser(data, email.toStdString(), password.toStdString());
-        file.close();
-    }
-
-    if (node.accountController()->count() == 0) {
-        std::string   loginHash;
-        AutologinHash autologinHash;
-        if (AutologinHash::isAvailable() && autologinHash.load()) {
-            loginHash = autologinHash.hash();
-        } else {
-            loginHash = Utils::calcHash((email + password).toStdString());
-            password.clear();
+        QString dfsLimit = parser.value(dfsLimitOption);
+        if (!dfsLimit.isEmpty()) {
+            bool    isOk  = false;
+            quint64 limit = dfsLimit.toULongLong(&isOk);
+            if (isOk) {
+                node->dfs()->setBytesLimit(limit);
+            }
         }
 
-        auto result = node.login(loginHash);
-        if (!result) {
-            if (AccountController::profilesList().size() != 0)
-                qInfo() << "Error: Incorrect login or password";
-            else
-                qInfo() << "Error: No profiles files";
-            std::exit(-1);
+        if (isNewNetwork) {
+            bool res = node->createNewNetwork(email.toStdString(), password.toStdString());
+            if (!res) {
+                qInfo() << "Can't create new network";
+                std::exit(0);
+            }
         }
-    }
+
+        QString importFile = parser.value(importOption);
+        if (!importFile.isEmpty()) {
+            QFile file(importFile);
+            file.open(QFile::ReadOnly);
+            auto data = file.readAll().toStdString();
+            if (data.empty()) {
+                qInfo() << "Incorrect import";
+                std::exit(0);
+            }
+            node->importUser(data, email.toStdString(), password.toStdString());
+            file.close();
+        }
+
+        if (node->accountController()->count() == 0) {
+            std::string   loginHash;
+            AutologinHash autologinHash;
+            if (AutologinHash::isAvailable() && autologinHash.load()) {
+                loginHash = autologinHash.hash();
+            } else {
+                loginHash = Utils::calcHash((email + password).toStdString());
+                password.clear();
+            }
+
+            auto result = node->login(loginHash);
+            if (!result) {
+                if (AccountController::profilesList().size() != 0)
+                    qInfo() << "Error: Incorrect login or password";
+                else
+                    qInfo() << "Error: No profiles files";
+                std::exit(-1);
+            }
+        }
+    });
 
     return app.exec();
 }

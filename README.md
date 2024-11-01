@@ -43,7 +43,7 @@ or Unix:
 
 For Windows x64:
 
-    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library cpp-base64 --triplet x64-windows
+    .\vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem boost-mp11 boost-describe boost-json msgpack fmt magic-enum hash-library cpp-base64 --triplet x64-windows
 
 and install integrate:
 
@@ -51,7 +51,7 @@ and install integrate:
 
 or Unix:
 
-    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem msgpack fmt magic-enum hash-library cpp-base64
+    ./vcpkg install libsodium sqlite3 boost-system boost-thread boost-variant boost-interprocess boost-multiprecision boost-asio boost-filesystem boost-mp11 boost-describe boost-json msgpack fmt magic-enum hash-library cpp-base64
 
 If Linux ARM, before:
 

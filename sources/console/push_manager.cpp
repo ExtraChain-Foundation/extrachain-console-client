@@ -19,7 +19,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
     auto &key = main->key();
 
-    QByteArray actorIdEncrypted = QByteArray::fromStdString(key.encryptSelf(actorId.toStdString()));
+    QByteArray actorIdEncrypted = ByteArray(key.encryptSelf(ByteArray(actorId).toBytes())).toQByteArray();
     DBConnector db("notification");
     db.open();
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
@@ -32,8 +32,8 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     }
 
     for (auto &&el : res) {
-        QString token = QString::fromStdString(key.decryptSelf(el["token"]));
-        QString os = QString::fromStdString(key.decryptSelf(el["os"]));
+        QString token = ByteArray(key.decryptSelf(ByteArray(el["token"]).toBytes())).toQString();
+        QString os = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
 
         if (os == "ios" || os == "android") {
             qDebug() << "[Push] New notification:" << actorId << notification;
@@ -55,9 +55,9 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
     auto &key = main->key();
 
     const std::string &osActorId = actorId.toStdString();
-    std::string apk = node->actorIndex()->getActor(actorId).key().publicKey();
-    std::string osDecrypted = key.decrypt(os.toStdString(), apk);
-    std::string osToken = key.decrypt(token.toStdString(), apk);
+    auto apk = node->actorIndex()->getActor(actorId).key().publicKey();
+    std::string osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
+    std::string osToken = ByteArray(key.decrypt(ByteArray(token.toString()).toBytes(), apk)).toString();
 
     if (osDecrypted != "ios" && osDecrypted != "android") {
         qDebug().noquote() << "[Push] Try save, but wrong os:" << QByteArray::fromStdString(osDecrypted);
@@ -98,7 +98,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
 
         DBConnector db("notification");
         db.open();
-        db.deleteRow("Notification", { { "token", key.encryptSelf(token.toStdString()) } });
+        db.deleteRow("Notification", { { "token", ByteArray(key.encryptSelf(ByteArray(token.toStdString()).toBytes())).toString() } });
     } else {
         qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
         // TODO: repeat request, ConnectionError
