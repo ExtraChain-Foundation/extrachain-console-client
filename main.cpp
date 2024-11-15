@@ -10,7 +10,6 @@
 
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
-#include "datastorage/dfs/dfs_controller.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "utils/exc_logs.h"
@@ -208,13 +207,13 @@ int main(int argc, char* argv[]) {
     //        return -1;
     //    }
 
-    Logger::instance().set_debug(true);
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
     Network::networkDebug  = parser.isSet(netdebOption);
     qInfo() << "Debug logs enabled:" << LogsManager::debugLogs;
 #endif
+    Logger::instance().set_debug(LogsManager::debugLogs);
 
     LogsManager::onFile();
 
@@ -226,7 +225,7 @@ int main(int argc, char* argv[]) {
     qInfo() << " └───────────────────────────────────────────┘";
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
-                                << ", SQLite " << DBConnector::sqlite_version() << ", Sodium "
+                                << ", SQLite " << DbConnector::sqlite_version() << ", Sodium "
                                 << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
@@ -275,7 +274,7 @@ int main(int argc, char* argv[]) {
             bool    isOk  = false;
             quint64 limit = dfsLimit.toULongLong(&isOk);
             if (isOk) {
-                node->dfs()->setBytesLimit(limit);
+                // node->dfs()->setBytesLimit(limit);
             }
         }
 

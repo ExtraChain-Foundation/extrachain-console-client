@@ -3,13 +3,13 @@
 #include <QProcess>
 #include <QTextStream>
 
-#include "datastorage/dfs/dfs_controller.h"
-#include "datastorage/index/actorindex.h"
+#include "dfs/dfs_controller.h"
+#include "blockchain/actor_index.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
 #include "network/isocket_service.h"
-#include "datastorage/blockchain.h"
+#include "blockchain/blockchain.h"
 #include "managers/transaction_manager.h"
 
 #ifdef Q_OS_UNIX
@@ -112,7 +112,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (sendtx.length() == 3) {
             QByteArray     toId   = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
-            qDebug() << "transaction" << toId << amount.toStdString(NumeralBase::Dec);
+            qDebug() << "transaction" << toId << amount.to_string(NumeralBase::Dec);
 
             ActorId receiver(toId.toStdString());
 
@@ -125,23 +125,23 @@ void ConsoleManager::commandReceiver(QString command) {
             // createTransaction
             node->sendTransaction(tx, node->accountController()->mainActor());
 
-//            if (mainActorId != firstId)
-//            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
-//            else
-//                node->createTransactionFrom(firstId, receiver, BigNumberFloat(10), ActorId());
+            //            if (mainActorId != firstId)
+            //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
+            //            else
+            //                node->createTransactionFrom(firstId, receiver, BigNumberFloat(10), ActorId());
         }
     }
 
     if (command == "cn count" || command == "connections count") {
-        qInfo() << "Connections:" << node->network()->connections().length();
+        qInfo() << "Connections:" << node->network()->connections()->length();
     }
 
     if (command == "cn list" || command == "connections list") {
-        auto &connections = node->network()->connections();
+        auto connections = *node->network()->connections();
 
-        if (connections.length() > 0) {
+        if (connections->length() > 0) {
             qInfo() << "Connections:";
-            std::for_each(connections.begin(), connections.end(), [](auto &el) {
+            std::for_each(connections->begin(), connections->end(), [](auto &el) {
                 qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
                                   << el->protocolString() << el->identifier();
             });
@@ -191,10 +191,10 @@ void ConsoleManager::commandReceiver(QString command) {
             }
 
             if (list[1] == "balance" || list[1] == "check_balance") {
-                const auto actors = node->actorIndex()->allActorsStd();
+                const auto actors = node->actorIndex()->allActors();
                 for (int i = 0; i < actors.size(); i++) {
                     const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), ActorId());
-                    std::cout << "[Actor: " << actors[i].c_str() << "] | ["
+                    std::cout << "[Actor: " << actors[i] << "] | ["
                               << "Balance: " << balance << "]" << std::endl;
                 }
             }
@@ -213,16 +213,17 @@ void ConsoleManager::commandReceiver(QString command) {
         std::filesystem::path filepath(file);
         qInfo() << "Adding file to DFS:" << command.mid(8).data();
 
-        auto result = node->dfs()->addLocalFile(
-            node->accountController()->mainActor(),
+        auto result = node->dfs()->storeFile(
+            node->accountController()->mainActor()->id(),
             file,
+            "",
             filepath.filename().string(),
-            DFS::Encryption::Public);
+            Dfs::Encryption::Public);
         if (!result.has_value())
             return;
-        auto res = QString::fromStdString(result.value());
-        if (res.left(5) == "Error") {
-            qDebug() << res;
+
+        if (!result.has_value()) {
+            eInfo("Error: {}", result.error());
         }
     }
 
@@ -249,7 +250,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(6) == "export") {
         auto    data = QString::fromStdString(node->exportUser());
         QString fileName =
-            QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toString());
+            QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toQString());
         QFile file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)
@@ -260,7 +261,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(16) == "list_user_files ") {
         auto userId = command.split(" ")[1];
         qInfo() << "show list user " << userId << " files";
-        std::filesystem::path actorFolderPath = DFSB::fsActrRoot + "/" + userId.toStdString();
+        std::filesystem::path actorFolderPath = DfsB::fsActrRoot + "/" + userId.toStdString();
         std::cout << "======================================================" << std::endl;
 
         for (const auto &entry : std::filesystem::recursive_directory_iterator(actorFolderPath)) {
@@ -283,7 +284,7 @@ void ConsoleManager::commandReceiver(QString command) {
         auto actorId = node->accountController()->mainActor()->id();
         auto coins   = command.split(" ")[1];
 
-        qInfo() << "Request coins: " << coins << "for " << actorId.toString();
+        qInfo() << "Request coins: " << coins << "for " << actorId.toQString();
         // node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
@@ -333,27 +334,27 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
 }
 
 void ConsoleManager::dfsStart() {
-    QObject::connect(
-        node->dfs(),
-        &DfsController::added,
-        [](ActorId actorId, std::string fileHash, std::string visual, uint64_t size) {
-            qInfo() << "[Console/DFS] Added" << actorId << QString::fromStdString(fileHash)
-                    << QString::fromStdString(visual) << size;
-        });
-    QObject::connect(node->dfs(), &DfsController::uploaded, [](ActorId actorId, std::string fileHash) {
-        qInfo() << "[Console/DFS] Uploaded" << actorId << QString::fromStdString(fileHash);
+    connect(node->dfs(), &DfsController::added, [](Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Added: {}", dirRow);
     });
-    QObject::connect(node->dfs(), &DfsController::downloaded, [](ActorId actorId, std::string fileHash) {
-        qInfo() << "[Console/DFS] Downloaded" << actorId << QString::fromStdString(fileHash);
+
+    connect(node->dfs(), &DfsController::uploaded, [](Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Uploaded: {}", dirRow);
     });
-    QObject::connect(
+
+    connect(node->dfs(), &DfsController::downloaded, [](Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Downloaded: {}", dirRow);
+    });
+
+    connect(
         node->dfs(),
         &DfsController::downloadProgress,
         [](ActorId actorId, std::string hash, int progress) {
             qInfo() << "[Console/DFS] Download progress:" << actorId << QString::fromStdString(hash)
                     << progress;
         });
-    QObject::connect(
+
+    connect(
         node->dfs(),
         &DfsController::uploadProgress,
         [](ActorId actorId, std::string fileHash, int progress) {
