@@ -34,7 +34,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
 
     for (auto &&el : res) {
         QString token = ByteArray(key.decryptSelf(ByteArray(el["token"]).toBytes())).toQString();
-        QString os = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
+        QString os    = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
 
         if (os == "ios" || os == "android") {
             eLog("[Push] New notification: {} {}", actorId, notification.data);
@@ -55,8 +55,8 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         return;
     auto &key = main->key();
 
-    const std::string &osActorId = actorId.to_string();
-    auto               apk = node->actorIndex()->getActor(actorId).key().publicKey();
+    const std::string &osActorId   = actorId.to_string();
+    auto               apk         = node->actorIndex()->getActor(actorId).key().publicKey();
     std::string        osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
     std::string        osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
 
@@ -86,7 +86,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
     }
 
     QByteArray answer = reply->readAll();
-    auto       json = QJsonDocument::fromJson(answer);
+    auto       json   = QJsonDocument::fromJson(answer);
     eLog("[Push] Result: {}", json.toJson(QJsonDocument::Compact));
 
     QString errorType = json["errorType"].toString();
@@ -97,7 +97,7 @@ void PushManager::responseResolver(QNetworkReply *reply) {
         eLog("[Push] Remove token {}", token);
 
         auto &main = node->accountController()->mainActor();
-        auto &key = main->key();
+        auto &key  = main->key();
 
         DbConnector db("notification");
         db.open();
@@ -149,14 +149,14 @@ void PushManager::chatMessage(QString sender, QString msgPath) {
 
 void PushManager::sendNotification(const QString &token, const QString &os, const Notification &notification) {
     QJsonObject json;
-    json["os"] = os;
-    json["token"] = token;
+    json["os"]      = os;
+    json["token"]   = token;
     json["message"] = notificationToMessage(notification);
 
     QJsonObject data;
     data["notifyType"] = notification.type;
-    data["data"] = QString(notification.data);
-    json["data"] = data;
+    data["data"]       = QString(notification.data);
+    json["data"]       = data;
 
     QString jsonStr = QJsonDocument(json).toJson();
     eLog("[Push] Send {}", QJsonDocument(json).toJson(QJsonDocument::Compact));
@@ -170,39 +170,39 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     switch (notification.type) {
     case (Notification::NotifyType::TxToUser):
         message = "Transaction to *" + notification.data.right(5) + " completed";
-        userId = "";
+        userId  = "";
         break;
     case (Notification::NotifyType::TxToMe):
         message = "New transaction from *" + notification.data.right(5);
-        userId = "";
+        userId  = "";
         break;
     case (Notification::NotifyType::ChatMsg): {
         QByteArray chatId = notification.data.split(' ').at(0);
-        message = "New message from ";
-        userId = chatId;
+        message           = "New message from ";
+        userId            = chatId;
         break;
     }
     case (Notification::NotifyType::ChatInvite): {
         QByteArray user = notification.data.split(' ').at(0);
-        message = "New chat from ";
-        userId = user;
+        message         = "New chat from ";
+        userId          = user;
         break;
     }
     case (Notification::NotifyType::NewPost): {
         QByteArray user = notification.data.split(' ').at(0);
-        message = "New post from ";
-        userId = user;
+        message         = "New post from ";
+        userId          = user;
         break;
     }
     case (Notification::NotifyType::NewEvent): {
         QByteArray user = notification.data.split(' ').at(0);
-        message = "New event from ";
-        userId = user;
+        message         = "New event from ";
+        userId          = user;
         break;
     }
     case (Notification::NotifyType::NewFollower):
         message = "New follower ";
-        userId = notification.data;
+        userId  = notification.data;
         break;
     }
 

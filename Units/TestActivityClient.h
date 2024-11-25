@@ -21,7 +21,7 @@ class TestActorIndex {
         delete actorIndex;
     }
 
-    TestActorIndex(const TestActorIndex&) = delete;
+    TestActorIndex(const TestActorIndex&)            = delete;
     TestActorIndex& operator=(const TestActorIndex&) = delete;
 
 

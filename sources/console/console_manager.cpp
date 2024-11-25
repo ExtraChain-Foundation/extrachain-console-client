@@ -106,11 +106,11 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(6) == "transaction") {
         eLog("[Console] 'transaction' command");
         auto    mainActorId = node->accountController()->mainActor()->id();
-        ActorId firstId = node->actorIndex()->firstId();
+        ActorId firstId     = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");
         if (sendtx.length() == 3) {
-            QByteArray     toId = sendtx[1].toUtf8();
+            QByteArray     toId   = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
             eLog("transaction {} {}", toId, amount.to_string(NumeralBase::Dec));
 
@@ -231,7 +231,7 @@ void ConsoleManager::commandReceiver(QString command) {
             eInfo("List has less 2 parameters");
         } else {
             const std::string pathToNewFolder = list[2].toStdString();
-            const std::string pathToDfsFile = list[3].toStdString();
+            const std::string pathToDfsFile   = list[3].toStdString();
             if (pathToNewFolder.empty() || pathToDfsFile.empty()) {
                 eLog("One or more parameters is empty. Please check in parameters.");
                 return;
@@ -246,7 +246,7 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command.left(6) == "export") {
-        auto    data = QString::fromStdString(node->exportUser());
+        auto    data     = QString::fromStdString(node->exportUser());
         QString fileName = QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toQString());
         QFile   file(fileName);
         file.open(QFile::WriteOnly);
@@ -278,7 +278,7 @@ void ConsoleManager::commandReceiver(QString command) {
     // request_coins coins
     if (command.left(13) == "request_coins") {
         auto actorId = node->accountController()->mainActor()->id();
-        auto coins = command.split(" ")[1];
+        auto coins   = command.split(" ")[1];
 
         eInfo("Request coins:  {} for  {}", coins, actorId.toQString());
         // node->blockchain()->sendCoinReward(actorId, coins.toInt());

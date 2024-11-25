@@ -67,7 +67,7 @@ static void HandleSignal(int sig) {
                 void*         stackTrace[maxFrames];
                 WORD          frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
                 SYMBOL_INFO*  symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
-                symbol->MaxNameLen = 255;
+                symbol->MaxNameLen   = 255;
                 symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
                 IMAGEHLP_LINE64 line;
                 line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
@@ -104,7 +104,7 @@ static void HandleSignal(int sig) {
 #elif defined(Q_OS_LINUX)
             void*  stackTrace[64];
             int    frameCount = backtrace(stackTrace, 64);
-            char** symbols = backtrace_symbols(stackTrace, frameCount);
+            char** symbols    = backtrace_symbols(stackTrace, frameCount);
             if (symbols != nullptr) {
                 for (int i = 0; i < frameCount; ++i)
                     eInfo("# {} :  {}", i, symbols[i]);
@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
-    Network::networkDebug = parser.isSet(netdebOption);
+    Network::networkDebug  = parser.isSet(netdebOption);
     eInfo("Debug logs enabled: {}", LogsManager::debugLogs);
 #endif
     Logger::instance().set_debug(LogsManager::debugLogs);
@@ -243,7 +243,7 @@ int main(int argc, char* argv[]) {
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argEmail = parser.value(emailOption);
+    QString argEmail    = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
     QString email =
         argEmail.isEmpty() && !AutologinHash::isAvailable() ? ConsoleManager::getSomething("e-mail") : argEmail;
@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
         console.startInput();
 
     ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app, false, false, true);
-    auto                   node = nodeWrapper->node;
+    auto                   node        = nodeWrapper->node;
     nodeWrapper->Init(true);
 
     if (parser.isSet(blockDisableCompress)) {
@@ -272,7 +272,7 @@ int main(int argc, char* argv[]) {
 
         QString dfsLimit = parser.value(dfsLimitOption);
         if (!dfsLimit.isEmpty()) {
-            bool    isOk = false;
+            bool    isOk  = false;
             quint64 limit = dfsLimit.toULongLong(&isOk);
             if (isOk) {
                 // node->dfs()->setBytesLimit(limit);
