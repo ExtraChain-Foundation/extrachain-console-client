@@ -10,20 +10,19 @@ namespace fs = std::filesystem;
 
 class TestActorIndex {
 
-    ActorIndex *actorIndex;
+    ActorIndex* actorIndex;
 
-    TestActorIndex(){
+    TestActorIndex() {
         ExtraChainNode node;
         actorIndex = new ActorIndex(node);
     }
 
-    ~TestActorIndex(){
+    ~TestActorIndex() {
         delete actorIndex;
     }
 
     TestActorIndex(const TestActorIndex&) = delete;
     TestActorIndex& operator=(const TestActorIndex&) = delete;
-
 
 
 public:
@@ -39,7 +38,6 @@ public:
     ActorIndex* getActorIndex() const {
         return actorIndex;
     }
-
 };
 
 

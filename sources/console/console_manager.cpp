@@ -30,12 +30,12 @@ ConsoleManager::ConsoleManager(QObject *parent)
 }
 
 ConsoleManager::~ConsoleManager() {
-    qDebug() << "[Console] Stop";
+    eLog("[Console] Stop");
 }
 
 void ConsoleManager::commandReceiver(QString command) {
     command = command.simplified();
-    qDebug() << "[Console] Input:" << command;
+    eLog("[Console] Input: {}", command);
 
     // TODO: process coin request
     //    if (node->listenCoinRequest())
@@ -61,24 +61,24 @@ void ConsoleManager::commandReceiver(QString command) {
     //    }
 
     if (command == "quit" || command == "exit") {
-        qInfo() << "Exit...";
+        eInfo("Exit...");
         qApp->quit();
     }
 
     if (command == "wipe") {
         Utils::wipeDataFiles();
-        qInfo() << "Wiped and exit...";
+        eInfo("Wiped and exit...");
         qApp->quit();
     }
 
     if (command == "logs on") {
         LogsManager::on();
-        qInfo() << "Logs enabled";
+        eInfo("Logs enabled");
     }
 
     if (command == "logs off") {
         LogsManager::off();
-        qInfo() << "Logs disabled";
+        eInfo("Logs disabled");
     }
 
     if (command.left(3) == "dir") {
@@ -99,20 +99,20 @@ void ConsoleManager::commandReceiver(QString command) {
 #elif defined(Q_OS_MAC)
         QProcess::execute("open", { QDir::currentPath() });
 #else
-        qInfo() << "Command \"dir\" not implemented for this platform";
+        eInfo("Command \"dir\" not implemented for this platform");
 #endif
     }
 
     if (command.left(6) == "transaction") {
-        qDebug() << "[Console] 'transaction' command";
+        eLog("[Console] 'transaction' command");
         auto    mainActorId = node->accountController()->mainActor()->id();
-        ActorId firstId     = node->actorIndex()->firstId();
+        ActorId firstId = node->actorIndex()->firstId();
 
         QStringList sendtx = command.split(" ");
         if (sendtx.length() == 3) {
-            QByteArray     toId   = sendtx[1].toUtf8();
+            QByteArray     toId = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
-            qDebug() << "transaction" << toId << amount.to_string(NumeralBase::Dec);
+            eLog("transaction {} {}", toId, amount.to_string(NumeralBase::Dec));
 
             ActorId receiver(toId.toStdString());
 
@@ -133,22 +133,22 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command == "cn count" || command == "connections count") {
-        qInfo() << "Connections:" << node->network()->connections()->length();
+        eInfo("Connections: {}", node->network()->connections()->size());
     }
 
     if (command == "cn list" || command == "connections list") {
         auto connections = *node->network()->connections();
 
-        if (connections->length() > 0) {
-            qInfo() << "Connections:";
+        if (connections->size() > 0) {
+            eInfo("Connections:");
             std::for_each(connections->begin(), connections->end(), [](auto &el) {
                 qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
                                   << el->protocolString() << el->identifier();
             });
         } else {
-            qInfo() << "No connections";
+            eInfo("No connections");
         }
-        qInfo() << "-----------";
+        eInfo("-----------");
     }
 
     if (command.left(7) == "connect") {
@@ -166,7 +166,7 @@ void ConsoleManager::commandReceiver(QString command) {
             qInfo().noquote() << "Connect to" << ip << protocol;
             node->network()->connectToNode(ip, networkProtocol);
         } else {
-            qInfo() << "Invalid connect input";
+            eInfo("Invalid connect input");
         }
     }
 
@@ -175,17 +175,17 @@ void ConsoleManager::commandReceiver(QString command) {
         if (list.length() > 1) {
             if (list[1] == "new") {
                 auto actor = node->accountController()->createWallet();
-                qInfo() << "Wallet created:" << actor.id();
+                eInfo("Wallet created: {}", actor.id());
             }
 
             if (list[1] == "list") {
-                qInfo() << "Wallets:";
+                eInfo("Wallets:");
                 auto actors = node->accountController()->accounts();
                 auto mainId = node->accountController()->mainActor()->id();
-                qInfo() << "User" << mainId;
+                eInfo("User {}", mainId);
                 for (const auto &actor : actors) {
                     if (actor->id() != node->accountController()->mainActor()->id()) {
-                        qInfo() << "Wallet" << actor->id();
+                        eInfo("Wallet {}", actor->id());
                     }
                 }
             }
@@ -194,8 +194,7 @@ void ConsoleManager::commandReceiver(QString command) {
                 const auto actors = node->actorIndex()->allActors();
                 for (int i = 0; i < actors.size(); i++) {
                     const auto balance = node->blockchain()->getUserBalance(ActorId(actors[i]), ActorId());
-                    std::cout << "[Actor: " << actors[i] << "] | ["
-                              << "Balance: " << balance << "]" << std::endl;
+                    eInfo("[Actor: {}, balance: ", actors[i], balance);
                 }
             }
         }
@@ -203,7 +202,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(4) == "push") {
         command.replace(QRegularExpression("\\s+"), " ");
-        QString      actorId = command.mid(5, 20);
+        QString      actorId = command.mid(5, 40);
         Notification notify { .time = 100, .type = Notification::NewPost, .data = actorId.toLatin1() + " " };
         m_pushManager->pushNotification(actorId, notify);
     }
@@ -211,14 +210,13 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(8) == "dfs add ") {
         auto                  file = command.mid(8).toStdWString();
         std::filesystem::path filepath(file);
-        qInfo() << "Adding file to DFS:" << command.mid(8).data();
+        eInfo("Adding file to DFS: {}", command.mid(8));
 
-        auto result = node->dfs()->storeFile(
-            node->accountController()->mainActor()->id(),
-            file,
-            "",
-            filepath.filename().string(),
-            Dfs::Encryption::Public);
+        auto result = node->dfs()->storeFile(node->accountController()->mainActor()->id(),
+                                             file,
+                                             "",
+                                             filepath.filename().string(),
+                                             Dfs::SecurityLevel::Public);
         if (!result.has_value())
             return;
 
@@ -230,12 +228,12 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(8) == "dfs get ") {
         auto list = command.split(" ");
         if (list.size() < 4) {
-            qInfo() << "List has less 2 parameters";
+            eInfo("List has less 2 parameters");
         } else {
             const std::string pathToNewFolder = list[2].toStdString();
-            const std::string pathToDfsFile   = list[3].toStdString();
+            const std::string pathToDfsFile = list[3].toStdString();
             if (pathToNewFolder.empty() || pathToDfsFile.empty()) {
-                qDebug() << "One or more parameters is empty. Please check in parameters.";
+                eLog("One or more parameters is empty. Please check in parameters.");
                 return;
             }
 
@@ -249,18 +247,17 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "export") {
         auto    data = QString::fromStdString(node->exportUser());
-        QString fileName =
-            QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toQString());
-        QFile file(fileName);
+        QString fileName = QString("%1.extrachain").arg(node->accountController()->mainActor()->id().toQString());
+        QFile   file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)
-            qInfo() << "Exported to" << fileName;
+            eInfo("Exported to {}", fileName);
         file.close();
     }
 
     if (command.left(16) == "list_user_files ") {
         auto userId = command.split(" ")[1];
-        qInfo() << "show list user " << userId << " files";
+        eInfo("show list user  {}  files", userId);
         std::filesystem::path actorFolderPath = DfsB::fsActrRoot + "/" + userId.toStdString();
         std::cout << "======================================================" << std::endl;
 
@@ -270,8 +267,7 @@ void ConsoleManager::commandReceiver(QString command) {
                 continue;
 
             if (!std::filesystem::is_directory(entry)) {
-                const std::string filePath =
-                    actorFolderPath.string() + "/" + entry.path().filename().string();
+                const std::string filePath = actorFolderPath.string() + "/" + entry.path().filename().string();
                 std::cout << entry.path() << std::endl;
             } else {
                 std::cout << "------------------------------------------------------" << std::endl;
@@ -282,9 +278,9 @@ void ConsoleManager::commandReceiver(QString command) {
     // request_coins coins
     if (command.left(13) == "request_coins") {
         auto actorId = node->accountController()->mainActor()->id();
-        auto coins   = command.split(" ")[1];
+        auto coins = command.split(" ")[1];
 
-        qInfo() << "Request coins: " << coins << "for " << actorId.toQString();
+        eInfo("Request coins:  {} for  {}", coins, actorId.toQString());
         // node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
@@ -309,12 +305,12 @@ void ConsoleManager::startInput() {
     DWORD consoleMode;
     bool  isInteractive = GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &consoleMode);
     if (!isInteractive) {
-        qDebug() << "[Console] Console is not interactive, command input is disabled";
+        eLog("[Console] Console is not interactive, command input is disabled");
         return;
     }
 
     // if (IsDebuggerPresent()) {
-    //     qDebug() << "[Console] Input off, because debugger mode";
+    //     eLog("[Console] Input off, because debugger mode");
     //     return;
     // }
 
@@ -346,21 +342,13 @@ void ConsoleManager::dfsStart() {
         eInfo("[Console/Ddf] Downloaded: {}", dirRow);
     });
 
-    connect(
-        node->dfs(),
-        &DfsController::downloadProgress,
-        [](ActorId actorId, std::string hash, int progress) {
-            qInfo() << "[Console/DFS] Download progress:" << actorId << QString::fromStdString(hash)
-                    << progress;
-        });
+    connect(node->dfs(), &DfsController::downloadProgress, [](ActorId actorId, std::string hash, int progress) {
+        eInfo("[Console/DFS] Download progress: {} {} {}", actorId, QString::fromStdString(hash), progress);
+    });
 
-    connect(
-        node->dfs(),
-        &DfsController::uploadProgress,
-        [](ActorId actorId, std::string fileHash, int progress) {
-            qInfo() << "[Console/DFS] Upload progress:" << actorId << QString::fromStdString(fileHash) << " "
-                    << progress;
-        });
+    connect(node->dfs(), &DfsController::uploadProgress, [](ActorId actorId, std::string fileHash, int progress) {
+        eInfo("[Console/DFS] Upload progress: {} {}   {}", actorId, QString::fromStdString(fileHash), progress);
+    });
 }
 
 QString ConsoleManager::getSomething(const QString &name) {
@@ -373,7 +361,7 @@ QString ConsoleManager::getSomething(const QString &name) {
         something = cin.readLine();
 
         if (something.indexOf(" ") != -1) {
-            qInfo() << "Please enter without spaces";
+            eInfo("Please enter without spaces");
             something = "";
             continue;
         }
@@ -381,7 +369,7 @@ QString ConsoleManager::getSomething(const QString &name) {
 
     if (something == "wipe") {
         Utils::wipeDataFiles();
-        qInfo() << "Wiped and exit...";
+        eInfo("Wiped and exit...");
         std::exit(0);
     }
 

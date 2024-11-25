@@ -1,6 +1,5 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
-#include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QLockFile>
@@ -52,23 +51,23 @@ static void HandleSignal(int sig) {
 #endif
         case SIGINT:
         case SIGTERM: {
-            qCritical() << "Signal achieved: " << strsignal(sig);
+            eCritical("Signal achieved:  {}", strsignal(sig));
             QCoreApplication::quit();
             break;
         }
         case SIGABRT:
         case SIGSEGV: {
-            qCritical() << "Catch signal: " << strsignal(sig);
+            eCritical("Catch signal:  {}", strsignal(sig));
 #ifdef Q_OS_WIN
             SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_DEBUG);
             if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
-                qCritical() << "Failed to initialize symbol handler. Error:" << GetLastError();
+                eCritical("Failed to initialize symbol handler. Error: {}", GetLastError());
             } else {
                 constexpr int maxFrames = 64;
                 void*         stackTrace[maxFrames];
                 WORD          frames = CaptureStackBackTrace(0, maxFrames, stackTrace, nullptr);
                 SYMBOL_INFO*  symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
-                symbol->MaxNameLen   = 255;
+                symbol->MaxNameLen = 255;
                 symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
                 IMAGEHLP_LINE64 line;
                 line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
@@ -78,23 +77,26 @@ static void HandleSignal(int sig) {
                     DWORD   displacement;
                     if (SymFromAddr(GetCurrentProcess(), address, 0, symbol)) {
                         if (SymGetLineFromAddr64(GetCurrentProcess(), address, &displacement, &line)) {
-                            qInfo() << QString("#%1: %2 in %3 : line %4")
-                                           .arg(i)
-                                           .arg(symbol->Name)
-                                           .arg(line.FileName)
-                                           .arg(line.LineNumber);
+                            eInfo("{}",
+                                  QString("#%1: %2 in %3 : line %4")
+                                      .arg(i)
+                                      .arg(symbol->Name)
+                                      .arg(line.FileName)
+                                      .arg(line.LineNumber));
                         } else {
-                            qInfo() << QString("#%1: %2 - 0x%3 (Failed to get line info, error: %4)")
-                                           .arg(i)
-                                           .arg(symbol->Name)
-                                           .arg(QString::number(address, 16))
-                                           .arg(GetLastError());
+                            eInfo("{}",
+                                  QString("#%1: %2 - 0x%3 (Failed to get line info, error: %4)")
+                                      .arg(i)
+                                      .arg(symbol->Name)
+                                      .arg(QString::number(address, 16))
+                                      .arg(GetLastError()));
                         }
                     } else {
-                        qInfo() << QString("#%1: 0x%2 (Failed to get symbol, error: %3)")
-                                       .arg(i)
-                                       .arg(QString::number(address, 16))
-                                       .arg(GetLastError());
+                        eInfo("{}",
+                              QString("#%1: 0x%2 (Failed to get symbol, error: %3)")
+                                  .arg(i)
+                                  .arg(QString::number(address, 16))
+                                  .arg(GetLastError()));
                     }
                 }
                 free(symbol);
@@ -102,10 +104,10 @@ static void HandleSignal(int sig) {
 #elif defined(Q_OS_LINUX)
             void*  stackTrace[64];
             int    frameCount = backtrace(stackTrace, 64);
-            char** symbols    = backtrace_symbols(stackTrace, frameCount);
+            char** symbols = backtrace_symbols(stackTrace, frameCount);
             if (symbols != nullptr) {
                 for (int i = 0; i < frameCount; ++i)
-                    qInfo() << "#" << i << ": " << symbols[i];
+                    eInfo("# {} :  {}", i, symbols[i]);
                 free(symbols);
             }
 #endif
@@ -119,7 +121,7 @@ static void HandleSignal(int sig) {
             exit(EXIT_FAILURE);
         }
     } catch (const std::exception& ex) {
-        qCritical() << "SignalHandler exception: " << ex.what();
+        eCritical("SignalHandler exception:  {}", ex.what());
         _exit(EXIT_FAILURE);
     }
 }
@@ -133,8 +135,9 @@ bool SetupSignals() {
 
     for (const auto& item : arrSig) {
         if (signal(item, HandleSignal) == SIG_ERR) {
-            qCritical() << "Cannot handle a signal: " + QString::fromStdString(strsignal(item))
-                               + ", reason - " + QString::fromStdString(strerror(errno));
+            eCritical("{}",
+                      "Cannot handle a signal: " + QString::fromStdString(strsignal(item)) + ", reason - "
+                          + QString::fromStdString(strerror(errno)));
             return false;
         }
     }
@@ -158,8 +161,8 @@ int main(int argc, char* argv[]) {
     QCommandLineParser parser;
     parser.setApplicationDescription(
         "ExtraChain (ExC) is a lightweight blockchain infrastructure and decentralized storage ExDFS "
-        "allowing creation of high-load dApps (decentralized applications) for both portable, non-portable "
-        "and IoT devices.");
+        "allowing creation of high-load dApps (decentralized applications) for both portable, "
+        "non-portable and IoT devices.");
     parser.addHelpOption();
     parser.addVersionOption();
 
@@ -200,29 +203,28 @@ int main(int argc, char* argv[]) {
     //    QLockFile lockFile(".console.lock");
     //    if (!lockFile.tryLock(100)) {
     //        if (!QFile::exists(".console.lock")) {
-    //            qDebug() << "[Console] Unable to write files. Check folder permissions";
+    //            eLog("[Console] Unable to write files. Check folder permissions");
     //            return -1;
     //        }
-    //        qDebug() << "[Console] Already running in directory" << QDir::currentPath();
+    //        eLog("[Console] Already running in directory {}", QDir::currentPath());
     //        return -1;
     //    }
 
     LogsManager::debugLogs = parser.isSet(debugOption);
 #ifdef QT_DEBUG
     LogsManager::debugLogs = !parser.isSet(debugOption);
-    Network::networkDebug  = parser.isSet(netdebOption);
-    qInfo() << "Debug logs enabled:" << LogsManager::debugLogs;
+    Network::networkDebug = parser.isSet(netdebOption);
+    eInfo("Debug logs enabled: {}", LogsManager::debugLogs);
 #endif
     Logger::instance().set_debug(LogsManager::debugLogs);
 
     LogsManager::onFile();
 
-    qInfo() << " ┌───────────────────────────────────────────┐";
-    qInfo().nospace() << " │            ExtraChain " << EXTRACHAIN_VERSION << "." << COMPILE_DATE
-                      << "         │";
+    eInfo(" ┌───────────────────────────────────────────┐");
+    eInfo(" │          ExtraChain {}.{}          │", EXTRACHAIN_VERSION, COMPILE_DATE);
     if (LogsManager::debugLogs)
-        qInfo() << " │     Console:" << GIT_COMMIT << "| Core:" << GIT_COMMIT_CORE << "     │";
-    qInfo() << " └───────────────────────────────────────────┘";
+        eInfo(" │     Console: {} | Core: {}     │", GIT_COMMIT, GIT_COMMIT_CORE);
+    eInfo(" └───────────────────────────────────────────┘");
     LogsManager::etHandler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DbConnector::sqlite_version() << ", Sodium "
@@ -230,34 +232,33 @@ int main(int argc, char* argv[]) {
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
-    qInfo() << "";
-    qDebug() << "[Console] Debug logs on";
+    eInfo("");
+    eLog("[Console] Debug logs on");
 
     bool           isNewNetwork = parser.isSet(core);
     ConsoleManager console;
     if (!dirName.isEmpty())
-        qDebug() << "Custom data directory:" << dirName;
+        eLog("Custom data directory: {}", dirName);
 
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argEmail    = parser.value(emailOption);
+    QString argEmail = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
-    QString email       = argEmail.isEmpty() && !AutologinHash::isAvailable()
-                              ? ConsoleManager::getSomething("e-mail")
-                              : argEmail;
-    QString password    = argPassword.isEmpty() && !AutologinHash::isAvailable()
-                              ? ConsoleManager::getSomething("password")
-                              : argPassword;
+    QString email =
+        argEmail.isEmpty() && !AutologinHash::isAvailable() ? ConsoleManager::getSomething("e-mail") : argEmail;
+    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
+                           ? ConsoleManager::getSomething("password")
+                           : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
-        qDebug() << "[Console] Input off";
+        eLog("[Console] Input off");
     else
         console.startInput();
 
     ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app, false, false, true);
-    auto                   node        = nodeWrapper->node;
+    auto                   node = nodeWrapper->node;
     nodeWrapper->Init(true);
 
     if (parser.isSet(blockDisableCompress)) {
@@ -265,13 +266,13 @@ int main(int argc, char* argv[]) {
     }
 
     QObject::connect(node, &ExtraChainNode::NodeInitialised, [&]() {
-        qDebug() << "[Console] Activated";
+        eLog("[Console] Activated");
         console.setExtraChainNode(node);
         console.dfsStart();
 
         QString dfsLimit = parser.value(dfsLimitOption);
         if (!dfsLimit.isEmpty()) {
-            bool    isOk  = false;
+            bool    isOk = false;
             quint64 limit = dfsLimit.toULongLong(&isOk);
             if (isOk) {
                 // node->dfs()->setBytesLimit(limit);
@@ -281,7 +282,7 @@ int main(int argc, char* argv[]) {
         if (isNewNetwork) {
             bool res = node->createNewNetwork(email.toStdString(), password.toStdString());
             if (!res) {
-                qInfo() << "Can't create new network";
+                eInfo("Can't create new network");
                 std::exit(0);
             }
         }
@@ -292,7 +293,7 @@ int main(int argc, char* argv[]) {
             file.open(QFile::ReadOnly);
             auto data = file.readAll().toStdString();
             if (data.empty()) {
-                qInfo() << "Incorrect import";
+                eInfo("Incorrect import");
                 std::exit(0);
             }
             node->importUser(data, email.toStdString(), password.toStdString());
@@ -305,16 +306,16 @@ int main(int argc, char* argv[]) {
             if (AutologinHash::isAvailable() && autologinHash.load()) {
                 loginHash = autologinHash.hash();
             } else {
-                loginHash = Utils::calcHash((email + password).toStdString());
+                loginHash = Utils::calculate_hash((email + password).toStdString());
                 password.clear();
             }
 
             auto result = node->login(loginHash);
             if (!result) {
                 if (AccountController::profilesList().size() != 0)
-                    qInfo() << "Error: Incorrect login or password";
+                    eInfo("Error: Incorrect login or password");
                 else
-                    qInfo() << "Error: No profiles files";
+                    eInfo("Error: No profiles files");
                 std::exit(-1);
             }
         }

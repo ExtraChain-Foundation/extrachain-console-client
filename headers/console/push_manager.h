@@ -26,12 +26,12 @@ public slots:
     //    void fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId);
 
 private:
-    void sendNotification(const QString &token, const QString &os, const Notification &notification);
+    void    sendNotification(const QString &token, const QString &os, const Notification &notification);
     QString notificationToMessage(const Notification &notification);
 
-    const QString pushServerUrl = "http://127.0.0.1:8000/";
+    const QString          pushServerUrl = "http://127.0.0.1:8000/";
     QNetworkAccessManager *manager;
-    ExtraChainNode *node;
+    ExtraChainNode        *node;
 };
 
 #endif // PUSHMANAGER_H

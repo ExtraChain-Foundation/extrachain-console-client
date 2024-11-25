@@ -2,7 +2,6 @@
 #define READER_H
 
 #include <QCoreApplication>
-#include <QDebug>
 #include <QNetworkAccessManager>
 
 #ifdef Q_OS_UNIX
@@ -24,6 +23,7 @@ public:
     ~ConsoleManager();
 
     PushManager *pushManager() const;
+
     void setExtraChainNode(ExtraChainNode *node);
     void startInput();
     void dfsStart();
@@ -40,14 +40,14 @@ public slots:
 private:
 #ifdef Q_OS_UNIX
     QSocketNotifier notifier;
-    QTextStream notifierInput;
+    QTextStream     notifierInput;
 #endif
 #ifdef Q_OS_WIN
     ConsoleInput consoleInput;
 #endif
 
     ExtraChainNode *node;
-    PushManager *m_pushManager;
+    PushManager    *m_pushManager;
 };
 
 #endif // READER_H

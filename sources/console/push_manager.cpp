@@ -23,22 +23,21 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     DbConnector db("notification");
     db.open();
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
-                                : db.select(
-                                      "SELECT * FROM Notification WHERE actorId = ?;",
-                                      "Notification",
-                                      { { "actorId", actorIdEncrypted.toStdString() } });
+                                : db.select("SELECT * FROM Notification WHERE actorId = ?;",
+                                            "Notification",
+                                            { { "actorId", actorIdEncrypted.toStdString() } });
 
     if (res.size() == 0) {
-        qDebug() << "[Push] Actor with id" << actorId << "has not configured any push";
+        eLog("[Push] Actor with id {} has not configured any push", actorId);
         return;
     }
 
     for (auto &&el : res) {
         QString token = ByteArray(key.decryptSelf(ByteArray(el["token"]).toBytes())).toQString();
-        QString os    = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
+        QString os = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
 
         if (os == "ios" || os == "android") {
-            qDebug() << "[Push] New notification:" << actorId << notification;
+            eLog("[Push] New notification: {} {}", actorId, notification.data);
             sendNotification(token, os, notification);
         }
     }
@@ -56,13 +55,13 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         return;
     auto &key = main->key();
 
-    const std::string &osActorId   = actorId.to_string();
-    auto               apk         = node->actorIndex()->getActor(actorId).key().publicKey();
+    const std::string &osActorId = actorId.to_string();
+    auto               apk = node->actorIndex()->getActor(actorId).key().publicKey();
     std::string        osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
-    std::string osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
+    std::string        osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
 
     if (osDecrypted != "ios" && osDecrypted != "android") {
-        qDebug().noquote() << "[Push] Try save, but wrong os:" << QByteArray::fromStdString(osDecrypted);
+        eLog("[Push] Try save, but wrong os: {}", osDecrypted);
         return;
     }
 
@@ -72,45 +71,47 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
     db.delete_row("Notification", { { "token", osToken } });
     db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
 
-    qDebug() << "[Push] Saved" << QByteArray::fromStdString(osDecrypted)
-             << QByteArray::fromStdString(osActorId) << QByteArray::fromStdString(osToken);
+    eLog("[Push] Saved {} {} {}",
+         QByteArray::fromStdString(osDecrypted),
+         QByteArray::fromStdString(osActorId),
+         QByteArray::fromStdString(osToken));
 }
 
 void PushManager::responseResolver(QNetworkReply *reply) {
-    // qDebug() << "[Push] Result from url" << reply->url().toString();
+    // eLog("[Push] Result from url {}", reply->url().toString());
 
     if (reply->error()) {
-        qDebug() << "[Push] Error:" << reply->errorString();
+        eLog("[Push] Error: {}", reply->errorString());
         return;
     }
 
     QByteArray answer = reply->readAll();
-    auto       json   = QJsonDocument::fromJson(answer);
-    qDebug() << "[Push] Result:" << json;
+    auto       json = QJsonDocument::fromJson(answer);
+    eLog("[Push] Result: {}", json.toJson(QJsonDocument::Compact));
 
     QString errorType = json["errorType"].toString();
     if (errorType == "None") {
-        qDebug() << "[Push] Successfully sent for" << json["errorText"].toString();
+        eLog("[Push] Successfully sent for {}", json["errorText"].toString());
     } else if (errorType == "BadDeviceToken" || errorType == "Unregistered") {
         QString token = json["errorText"].toString();
-        qDebug() << "[Push] Remove token" << token;
+        eLog("[Push] Remove token {}", token);
 
         auto &main = node->accountController()->mainActor();
-        auto &key  = main->key();
+        auto &key = main->key();
 
         DbConnector db("notification");
         db.open();
-        db.delete_row(
-            "Notification",
-            { { "token", ByteArray(key.encryptSelf(ByteArray(token.toStdString()).toBytes())).toString() } });
+        db.delete_row("Notification",
+                      { { "token",
+                          ByteArray(key.encryptSelf(ByteArray(token.toStdString()).toBytes())).toString() } });
     } else {
-        qDebug() << "[Push] Error:" << errorType << json["errorText"].toString();
+        eLog("[Push] Error: {} {}", errorType, json["errorText"].toString());
         // TODO: repeat request, ConnectionError
     }
 }
 
 void PushManager::chatMessage(QString sender, QString msgPath) {
-    //    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
+    //    QString userId = msgPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 40);
     //    QString chatId = msgPath.mid(32, 64);
 
     //    std::string usersPath = CardManager::buildPathForFile(
@@ -146,22 +147,19 @@ void PushManager::chatMessage(QString sender, QString msgPath) {
 //    }
 //}
 
-void PushManager::sendNotification(
-    const QString      &token,
-    const QString      &os,
-    const Notification &notification) {
+void PushManager::sendNotification(const QString &token, const QString &os, const Notification &notification) {
     QJsonObject json;
-    json["os"]      = os;
-    json["token"]   = token;
+    json["os"] = os;
+    json["token"] = token;
     json["message"] = notificationToMessage(notification);
 
     QJsonObject data;
     data["notifyType"] = notification.type;
-    data["data"]       = QString(notification.data);
-    json["data"]       = data;
+    data["data"] = QString(notification.data);
+    json["data"] = data;
 
     QString jsonStr = QJsonDocument(json).toJson();
-    qDebug() << "[Push] Send" << json;
+    eLog("[Push] Send {}", QJsonDocument(json).toJson(QJsonDocument::Compact));
     manager->get(QNetworkRequest(QUrl(pushServerUrl + jsonStr)));
 }
 
@@ -172,39 +170,39 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     switch (notification.type) {
     case (Notification::NotifyType::TxToUser):
         message = "Transaction to *" + notification.data.right(5) + " completed";
-        userId  = "";
+        userId = "";
         break;
     case (Notification::NotifyType::TxToMe):
         message = "New transaction from *" + notification.data.right(5);
-        userId  = "";
+        userId = "";
         break;
     case (Notification::NotifyType::ChatMsg): {
         QByteArray chatId = notification.data.split(' ').at(0);
-        message           = "New message from ";
-        userId            = chatId;
+        message = "New message from ";
+        userId = chatId;
         break;
     }
     case (Notification::NotifyType::ChatInvite): {
         QByteArray user = notification.data.split(' ').at(0);
-        message         = "New chat from ";
-        userId          = user;
+        message = "New chat from ";
+        userId = user;
         break;
     }
     case (Notification::NotifyType::NewPost): {
         QByteArray user = notification.data.split(' ').at(0);
-        message         = "New post from ";
-        userId          = user;
+        message = "New post from ";
+        userId = user;
         break;
     }
     case (Notification::NotifyType::NewEvent): {
         QByteArray user = notification.data.split(' ').at(0);
-        message         = "New event from ";
-        userId          = user;
+        message = "New event from ";
+        userId = user;
         break;
     }
     case (Notification::NotifyType::NewFollower):
         message = "New follower ";
-        userId  = notification.data;
+        userId = notification.data;
         break;
     }
 
