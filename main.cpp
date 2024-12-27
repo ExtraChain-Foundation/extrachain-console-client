@@ -299,7 +299,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (isNewNetwork) {
-            bool res = node->createNewNetwork(email.toStdString(), password.toStdString());
+            bool res = node->create_new_network(email.toStdString(), password.toStdString());
             if (!res) {
                 eInfo("Can't create new network");
                 std::exit(0);

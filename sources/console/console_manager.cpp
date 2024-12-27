@@ -27,6 +27,7 @@
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
 #include "managers/thread_pool.h"
+#include "network/network_manager.h"
 #include "network/isocket_service.h"
 #include "blockchain/blockchain.h"
 #include "managers/transaction_manager.h"
@@ -231,11 +232,13 @@ void ConsoleManager::commandReceiver(QString command) {
         std::filesystem::path filepath(file);
         eInfo("Adding file to DFS: {}", command.mid(8));
 
-        auto result = node->dfs()->storeFile(node->accountController()->mainActor()->id(),
-                                             file,
-                                             "",
-                                             filepath.filename().string(),
-                                             Dfs::SecurityLevel::Public);
+        auto actor_id = node->accountController()->mainActor()->id();
+        auto result   = node->dfs()->store_file(actor_id,
+                                              actor_id,
+                                              file,
+                                              "",
+                                              filepath.filename().string(),
+                                              Dfs::DataSecurity::Public);
         if (!result.has_value())
             return;
 
@@ -349,24 +352,25 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
 }
 
 void ConsoleManager::dfsStart() {
-    connect(node->dfs(), &DfsController::added, [](Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Added: {}", dirRow);
+    connect(node->dfs(), &DfsController::added, [](ActorId owner_id, Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Added for {}: {}", owner_id, dirRow);
+    });
+    connect(node->dfs(), &DfsController::uploaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Uploaded for {}: {}", owner_id, dirRow);
     });
 
-    connect(node->dfs(), &DfsController::uploaded, [](Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Uploaded: {}", dirRow);
+    connect(node->dfs(), &DfsController::downloaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
+        eInfo("[Console/Ddf] Downloaded for {}: {}", owner_id, dirRow);
     });
 
-    connect(node->dfs(), &DfsController::downloaded, [](Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Downloaded: {}", dirRow);
-    });
+    connect(node->dfs(),
+            &DfsController::downloadProgress,
+            [](ActorId owner_id, std::string file_id, int progress) {
+                eInfo("[Console/DFS] Download progress: {}/{}: {}", owner_id, file_id, progress);
+            });
 
-    connect(node->dfs(), &DfsController::downloadProgress, [](ActorId actorId, std::string hash, int progress) {
-        eInfo("[Console/DFS] Download progress: {} {} {}", actorId, QString::fromStdString(hash), progress);
-    });
-
-    connect(node->dfs(), &DfsController::uploadProgress, [](ActorId actorId, std::string fileHash, int progress) {
-        eInfo("[Console/DFS] Upload progress: {} {}   {}", actorId, QString::fromStdString(fileHash), progress);
+    connect(node->dfs(), &DfsController::uploadProgress, [](ActorId owner_id, std::string file_id, int progress) {
+        eInfo("[Console/DFS] Upload progress: {}/{}: {}", owner_id, file_id, progress);
     });
 }
 

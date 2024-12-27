@@ -38,7 +38,8 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
     auto &key = main->key();
 
-    QByteArray  actorIdEncrypted = ByteArray(key.encryptSelf(ByteArray(actorId).toBytes())).toQByteArray();
+    auto        encrypt_res      = key.encrypt_self(ByteArray(actorId).toBytes());
+    QByteArray  actorIdEncrypted = ByteArray(encrypt_res.value()).toQByteArray();
     DbConnector db("notification");
     db.open();
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")
@@ -52,13 +53,13 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     }
 
     for (auto &&el : res) {
-        QString token = ByteArray(key.decryptSelf(ByteArray(el["token"]).toBytes())).toQString();
-        QString os    = ByteArray(key.decryptSelf(ByteArray(el["os"]).toBytes())).toQString();
+        // QString token = ByteArray(key.decrypt_self(ByteArray(el["token"]).toBytes())).toQString();
+        // QString os    = ByteArray(key.decrypt_self(ByteArray(el["os"]).toBytes())).toQString();
 
-        if (os == "ios" || os == "android") {
-            eLog("[Push] New notification: {} {}", actorId, notification.data);
-            sendNotification(token, os, notification);
-        }
+        // if (os == "ios" || os == "android") {
+        //     eLog("[Push] New notification: {} {}", actorId, notification.data);
+        //     sendNotification(token, os, notification);
+        // }
     }
 }
 
@@ -74,26 +75,26 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         return;
     auto &key = main->key();
 
-    const std::string &osActorId   = actorId.to_string();
-    auto               apk         = node->actorIndex()->getActor(actorId).key().publicKey();
-    std::string        osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
-    std::string        osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
+    const std::string &osActorId = actorId.to_string();
+    // auto               apk         = node->actorIndex()->getActor(actorId).key().public_key();
+    // std::string        osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
+    // std::string        osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
 
-    if (osDecrypted != "ios" && osDecrypted != "android") {
-        eLog("[Push] Try save, but wrong os: {}", osDecrypted);
-        return;
-    }
+    // if (osDecrypted != "ios" && osDecrypted != "android") {
+    //     eLog("[Push] Try save, but wrong os: {}", osDecrypted);
+    //     return;
+    // }
 
-    DbConnector db("notification");
-    db.open();
-    db.create_table(notificationTableCreation);
-    db.delete_row("Notification", { { "token", osToken } });
-    db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
+    // DbConnector db("notification");
+    // db.open();
+    // db.create_table(notificationTableCreation);
+    // db.delete_row("Notification", { { "token", osToken } });
+    // db.insert("Notification", { { "actorId", osActorId }, { "token", osToken }, { "os", osDecrypted } });
 
-    eLog("[Push] Saved {} {} {}",
-         QByteArray::fromStdString(osDecrypted),
-         QByteArray::fromStdString(osActorId),
-         QByteArray::fromStdString(osToken));
+    // eLog("[Push] Saved {} {} {}",
+    //      QByteArray::fromStdString(osDecrypted),
+    //      QByteArray::fromStdString(osActorId),
+    //      QByteArray::fromStdString(osToken));
 }
 
 void PushManager::responseResolver(QNetworkReply *reply) {
@@ -108,25 +109,25 @@ void PushManager::responseResolver(QNetworkReply *reply) {
     auto       json   = QJsonDocument::fromJson(answer);
     eLog("[Push] Result: {}", json.toJson(QJsonDocument::Compact));
 
-    QString errorType = json["errorType"].toString();
-    if (errorType == "None") {
-        eLog("[Push] Successfully sent for {}", json["errorText"].toString());
-    } else if (errorType == "BadDeviceToken" || errorType == "Unregistered") {
-        QString token = json["errorText"].toString();
-        eLog("[Push] Remove token {}", token);
+    // QString errorType = json["errorType"].toString();
+    // if (errorType == "None") {
+    //     eLog("[Push] Successfully sent for {}", json["errorText"].toString());
+    // } else if (errorType == "BadDeviceToken" || errorType == "Unregistered") {
+    //     QString token = json["errorText"].toString();
+    //     eLog("[Push] Remove token {}", token);
 
-        auto &main = node->accountController()->mainActor();
-        auto &key  = main->key();
+    //     auto &main = node->accountController()->mainActor();
+    //     auto &key  = main->key();
 
-        DbConnector db("notification");
-        db.open();
-        db.delete_row("Notification",
-                      { { "token",
-                          ByteArray(key.encryptSelf(ByteArray(token.toStdString()).toBytes())).toString() } });
-    } else {
-        eLog("[Push] Error: {} {}", errorType, json["errorText"].toString());
-        // TODO: repeat request, ConnectionError
-    }
+    //     DbConnector db("notification");
+    //     db.open();
+    //     db.delete_row("Notification",
+    //                   { { "token",
+    //                       ByteArray(key.encrypt_self(ByteArray(token.toStdString()).toBytes())).toString() } });
+    // } else {
+    //     eLog("[Push] Error: {} {}", errorType, json["errorText"].toString());
+    //     // TODO: repeat request, ConnectionError
+    // }
 }
 
 void PushManager::chatMessage(QString sender, QString msgPath) {
