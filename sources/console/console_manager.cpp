@@ -370,7 +370,7 @@ void ConsoleManager::dfsStart() {
             });
 
     connect(node->dfs(), &DfsController::uploadProgress, [](ActorId owner_id, std::string file_id, int progress) {
-        eInfo("[Console/DFS] Upload progress: {}/{}: {}", owner_id, file_id, progress);
+        // eInfo("[Console/DFS] Upload progress: {}/{}: {}", owner_id, file_id, progress);
     });
 }
 
