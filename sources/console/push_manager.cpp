@@ -34,9 +34,9 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
 
     auto main = node->accountController()->mainActor();
-    if (main->id() != node->actorIndex()->firstId())
+    if (main.id() != node->actorIndex()->firstId())
         return;
-    auto &key = main->key();
+    auto &key = main.key();
 
     auto        encrypt_res      = key.encrypt_self(ByteArray(actorId).toBytes());
     QByteArray  actorIdEncrypted = ByteArray(encrypt_res.value()).toQByteArray();
@@ -71,9 +71,9 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "os       BLOB             NOT NULL);";
 
     auto main = node->accountController()->mainActor();
-    if (main->id() != node->actorIndex()->firstId())
+    if (main.id() != node->actorIndex()->firstId())
         return;
-    auto &key = main->key();
+    auto &key = main.key();
 
     const std::string &osActorId = actorId.to_string();
     // auto               apk         = node->actorIndex()->getActor(actorId).key().public_key();
