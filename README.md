@@ -2,12 +2,12 @@
 
 ## Software stack
 
-* Qt 6.7.3
+* Qt 6.8
 * CMake 3.29+
 * vcpkg
 * Compilers:
   * Windows: MSVC 2022 or MSVC/Clang
-  * Ubuntu: Clang 16+ or GCC 13+
+  * Ubuntu: Clang or GCC
   * Android: NDK 26 (Clang)
   * MacOS or iOS: Apple Clang
 
@@ -26,6 +26,10 @@ For Ubuntu 24.04:
     sudo apt install make git curl zip unzip tar pkg-config autoconf libtool
     sudo snap install cmake --classic
     bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+    
+For macOS 15:
+
+    brew install pkg-config autoconf automake libtool
 
 3. And install vcpkg:
 

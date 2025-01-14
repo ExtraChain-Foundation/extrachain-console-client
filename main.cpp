@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app, false, false, true);
+    ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app);
     auto                   node        = nodeWrapper->node;
     nodeWrapper->Init(true);
 
