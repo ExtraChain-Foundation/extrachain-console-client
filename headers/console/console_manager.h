@@ -58,8 +58,8 @@ public slots:
 
 private:
 #ifdef Q_OS_UNIX
-    QSocketNotifier notifier;
-    QTextStream     notifierInput;
+        // QSocketNotifier notifier;
+        // QTextStream     notifierInput;
 #endif
 #ifdef Q_OS_WIN
     ConsoleInput consoleInput;

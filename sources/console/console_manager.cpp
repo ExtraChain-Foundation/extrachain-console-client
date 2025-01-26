@@ -42,8 +42,8 @@
 ConsoleManager::ConsoleManager(QObject *parent)
     : QObject(parent)
 #ifdef Q_OS_UNIX
-    , notifier(STDIN_FILENO, QSocketNotifier::Read)
-    , notifierInput(stdin, QIODevice::ReadOnly)
+// , notifier(STDIN_FILENO, QSocketNotifier::Read)
+// , notifierInput(stdin, QIODevice::ReadOnly)
 #endif
 {
     m_pushManager = new PushManager(node);
@@ -343,11 +343,11 @@ void ConsoleManager::startInput() {
     connect(&consoleInput, &ConsoleInput::input, this, &ConsoleManager::commandReceiver);
     ThreadPool::addThread(&consoleInput);
 #elif defined(Q_OS_UNIX)
-    connect(&notifier, &QSocketNotifier::activated, [this] {
-        QString line = notifierInput.readLine();
-        if (!line.isEmpty())
-            commandReceiver(line);
-    });
+    // connect(&notifier, &QSocketNotifier::activated, [this] {
+    //     QString line = notifierInput.readLine();
+    //     if (!line.isEmpty())
+    //         commandReceiver(line);
+    // });
 #endif
 }
 
