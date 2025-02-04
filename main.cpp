@@ -196,6 +196,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
+    QCommandLineOption megaOption("mega", "Create mega loot");
+
     parser.addOptions({ debugOption,
                         dirOption,
                         emailOption,
@@ -206,7 +208,8 @@ int main(int argc, char* argv[]) {
                         importOption,
                         netdebOption,
                         dfsLimitOption,
-                        blockDisableCompress });
+                        blockDisableCompress,
+                        megaOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -214,6 +217,7 @@ int main(int argc, char* argv[]) {
     Utils::dataDir(dirName.isEmpty() ? "console-data" : dirName);
     QDir().mkdir(Utils::dataDir());
     QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
+    Logger::start_file();
 
     if (parser.isSet(clearDataOption) || parser.isSet(core)) {
         Utils::wipeDataFiles();
@@ -338,6 +342,23 @@ int main(int argc, char* argv[]) {
                 std::exit(-1);
             }
         }
+
+        bool is_mega = parser.isSet(megaOption);
+        if (is_mega) {
+            auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->mainActor());
+            eInfo("[MEGA] Data rows size: {}", mega->dataRows().size());
+
+            if (!mega.has_value()) {
+                eLog("[MEGA] Error {}", mega.error());
+                qApp->exit();
+                return;
+            }
+
+            node->blockchain()->removeAll();
+            node->blockchain()->getBlockIndex().addBlock(mega.value());
+            qApp->exit();
+        }
+        return;
     });
 
     return app.exec();
