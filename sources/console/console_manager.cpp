@@ -162,8 +162,8 @@ void ConsoleManager::commandReceiver(QString command) {
         if (connections->size() > 0) {
             eInfo("Connections:");
             std::for_each(connections->begin(), connections->end(), [](auto &el) {
-                qInfo().noquote() << el->ip() << el->port() << el->serverPort() << el->isActive()
-                                  << el->protocolString() << el->identifier();
+                qInfo().noquote() << el->ip() << el->port() << el->server_port() << el->is_active()
+                                  << el->protocol_string() << el->identifier();
             });
         } else {
             eInfo("No connections");
