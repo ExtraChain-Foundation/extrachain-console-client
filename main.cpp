@@ -346,7 +346,6 @@ int main(int argc, char* argv[]) {
         bool is_mega = parser.isSet(megaOption);
         if (is_mega) {
             auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->mainActor());
-            eInfo("[MEGA] Data rows size: {}", mega->dataRows().size());
 
             if (!mega.has_value()) {
                 eLog("[MEGA] Error {}", mega.error());
@@ -354,6 +353,7 @@ int main(int argc, char* argv[]) {
                 return;
             }
 
+            eInfo("[MEGA] Data rows size: {}", mega->dataRows().size());
             node->blockchain()->removeAll();
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
