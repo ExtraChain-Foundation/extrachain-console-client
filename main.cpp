@@ -26,6 +26,7 @@
 
 #include <csignal>
 
+#include "extrachain_version.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
@@ -170,7 +171,7 @@ int main(int argc, char* argv[]) {
     app.setApplicationName("ExtraChain Console Client");
     app.setOrganizationName("ExtraChain Foundation");
     app.setOrganizationDomain("https://extrachain.io/");
-    app.setApplicationVersion(EXTRACHAIN_VERSION);
+    app.setApplicationVersion(QString::fromStdString(extrachain_version));
 
     if (!SetupSignals())
         exit(EXIT_FAILURE);
@@ -244,7 +245,7 @@ int main(int argc, char* argv[]) {
     LogsManager::onFile();
 
     eInfo(" ┌───────────────────────────────────────────┐");
-    eInfo(" │          ExtraChain {}.{}          │", EXTRACHAIN_VERSION, COMPILE_DATE);
+    eInfo(" │          ExtraChain {}.{}          │", extrachain_version, COMPILE_DATE);
     if (LogsManager::debugLogs)
         eInfo(" │     Console: {} | Core: {}     │", GIT_COMMIT, GIT_COMMIT_CORE);
     eInfo(" └───────────────────────────────────────────┘");

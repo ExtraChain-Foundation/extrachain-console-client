@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-file(STRINGS "../extrachain-core/extrachain_version" EXTRACHAIN_VERSION)
-project(extrachain-console LANGUAGES C CXX VERSION ${EXTRACHAIN_VERSION})
+project(extrachain-console LANGUAGES C CXX VERSION 1.0)
 
 set(EXTRACHAIN_STATIC_BUILD true)
 include(../extrachain-core/CMakeLists.txt)
