@@ -126,7 +126,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(6) == "transaction") {
         eLog("[Console] 'transaction' command");
         auto    mainActorId = node->accountController()->mainActor().id();
-        ActorId firstId     = node->actorIndex()->firstId();
+        ActorId firstId     = node->actorIndex()->network_id();
 
         QStringList sendtx = command.split(" ");
         if (sendtx.length() == 3) {
@@ -269,7 +269,7 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command.left(6) == "export") {
-        auto exported = node->exportUser();
+        auto exported = node->export_profile();
         if (!exported.has_value()) {
             eInfo("Can't export, error: {}", exported.error());
         }
