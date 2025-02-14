@@ -34,7 +34,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
 
     auto main = node->accountController()->mainActor();
-    if (main.id() != node->actorIndex()->firstId())
+    if (main.id() != node->actorIndex()->network_id())
         return;
     auto &key = main.key();
 
@@ -71,7 +71,7 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "os       BLOB             NOT NULL);";
 
     auto main = node->accountController()->mainActor();
-    if (main.id() != node->actorIndex()->firstId())
+    if (main.id() != node->actorIndex()->network_id())
         return;
     auto &key = main.key();
 
