@@ -320,7 +320,7 @@ int main(int argc, char* argv[]) {
                 eInfo("Incorrect import");
                 std::exit(0);
             }
-            node->importUser(data, email.toStdString(), password.toStdString());
+            node->import_profile(data, email.toStdString(), password.toStdString());
             file.close();
         }
 
