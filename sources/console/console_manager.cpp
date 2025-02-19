@@ -285,7 +285,7 @@ void ConsoleManager::commandReceiver(QString command) {
     if (command.left(16) == "list_user_files ") {
         auto userId = command.split(" ")[1];
         eInfo("show list user  {}  files", userId);
-        std::filesystem::path actorFolderPath = DfsB::fsActrRoot + "/" + userId.toStdString();
+        std::filesystem::path actorFolderPath = DfsB::DFS_FOLDER + "/" + userId.toStdString();
         std::cout << "======================================================" << std::endl;
 
         for (const auto &entry : std::filesystem::recursive_directory_iterator(actorFolderPath)) {
