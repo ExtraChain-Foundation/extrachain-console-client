@@ -178,6 +178,14 @@ int main(int argc, char* argv[]) {
 
     registerMetaTypes();
 
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+    static QLockFile lockFile(".extrachain-console.lock");
+    if (!lockFile.tryLock(100)) {
+        fmt::println("Extrachain Console Client already running in directory {}", QDir::currentPath());
+        std::exit(0);
+    }
+#endif
+
     QCommandLineParser parser;
     parser.setApplicationDescription(
         "ExtraChain (ExC) is a lightweight blockchain infrastructure and decentralized storage ExDFS "
