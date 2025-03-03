@@ -206,6 +206,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     QCommandLineOption megaOption("mega", "Create mega loot");
+    QCommandLineOption usernamesOption("create-usernames", "Create usernames database from network id");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -218,7 +219,8 @@ int main(int argc, char* argv[]) {
                         netdebOption,
                         dfsLimitOption,
                         blockDisableCompress,
-                        megaOption });
+                        megaOption,
+                        usernamesOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -350,6 +352,16 @@ int main(int argc, char* argv[]) {
                     eInfo("Error: No profiles files");
                 std::exit(-1);
             }
+        }
+
+        //
+        bool is_username = parser.isSet(usernamesOption);
+        if (is_username || isNewNetwork) {
+            auto res = node->create_usernames_vector();
+            if (!res) {
+                eInfo("Can't create usernames vector");
+            } else
+                eSuccess("Usernames vector created");
         }
 
         bool is_mega = parser.isSet(megaOption);
