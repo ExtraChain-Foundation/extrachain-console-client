@@ -355,7 +355,7 @@ int main(int argc, char* argv[]) {
         bool is_mega = parser.isSet(megaOption);
         if (is_mega) {
             Logger::instance().set_debug(true);
-            auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->mainActor());
+            auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->system_actor());
 
             if (!mega.has_value()) {
                 eLog("[MEGA] Error {}", mega.error());

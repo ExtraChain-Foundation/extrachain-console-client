@@ -125,7 +125,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "transaction") {
         eLog("[Console] 'transaction' command");
-        auto    mainActorId = node->accountController()->mainActor().id();
+        auto    mainActorId = node->accountController()->system_actor().id();
         ActorId firstId     = node->actorIndex()->network_id();
 
         QStringList sendtx = command.split(" ");
@@ -143,7 +143,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
             Transaction tx(mainActorId, receiver, amount);
             // createTransaction
-            node->sendTransaction(tx, node->accountController()->mainActor());
+            node->sendTransaction(tx, node->accountController()->system_actor());
 
             //            if (mainActorId != firstId)
             //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
@@ -201,10 +201,10 @@ void ConsoleManager::commandReceiver(QString command) {
             if (list[1] == "list") {
                 eInfo("Wallets:");
                 auto actors = node->accountController()->accounts();
-                auto mainId = node->accountController()->mainActor().id();
+                auto mainId = node->accountController()->system_actor().id();
                 eInfo("User {}", mainId);
                 for (const auto &actor : actors) {
-                    if (actor.id() != node->accountController()->mainActor().id()) {
+                    if (actor.id() != node->accountController()->system_actor().id()) {
                         eInfo("Wallet {}", actor.id());
                     }
                 }
@@ -233,7 +233,7 @@ void ConsoleManager::commandReceiver(QString command) {
         std::filesystem::path filepath(file);
         eInfo("Adding file to DFS: {}", command.mid(8));
 
-        auto actor_id = node->accountController()->mainActor().id();
+        auto actor_id = node->accountController()->system_actor().id();
         auto result   = node->dfs()->store_file(actor_id,
                                               actor_id,
                                               file,
@@ -273,9 +273,10 @@ void ConsoleManager::commandReceiver(QString command) {
         if (!exported.has_value()) {
             eInfo("Can't export, error: {}", exported.error());
         }
-        auto    data     = QString::fromStdString(exported.value());
-        QString fileName = QString("%1.extrachain").arg(node->accountController()->mainActor().id().toQString());
-        QFile   file(fileName);
+        auto    data = QString::fromStdString(exported.value());
+        QString fileName =
+            QString("%1.extrachain").arg(node->accountController()->system_actor().id().toQString());
+        QFile file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)
             eInfo("Exported to {}", fileName);
@@ -304,7 +305,7 @@ void ConsoleManager::commandReceiver(QString command) {
     }
     // request_coins coins
     if (command.left(13) == "request_coins") {
-        auto actorId = node->accountController()->mainActor().id();
+        auto actorId = node->accountController()->system_actor().id();
         auto coins   = command.split(" ")[1];
 
         eInfo("Request coins:  {} for  {}", coins, actorId.toQString());

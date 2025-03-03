@@ -33,7 +33,7 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
     if (!QFile::exists("notification"))
         return;
 
-    auto main = node->accountController()->mainActor();
+    auto main = node->accountController()->system_actor();
     if (main.id() != node->actorIndex()->network_id())
         return;
     auto &key = main.key();
@@ -70,7 +70,7 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
         "actorId  BLOB             NOT NULL, "
         "os       BLOB             NOT NULL);";
 
-    auto main = node->accountController()->mainActor();
+    auto main = node->accountController()->system_actor();
     if (main.id() != node->actorIndex()->network_id())
         return;
     auto &key = main.key();
