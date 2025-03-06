@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     static QLockFile lockFile(".extrachain-console.lock");
     if (!lockFile.tryLock(100)) {
-        fmt::println("Extrachain Console Client already running in directory {}", QDir::currentPath());
+        fmt::println("ExtraChain Console Client already running in directory {}", QDir::currentPath());
         std::exit(0);
     }
 #endif
@@ -206,7 +206,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     QCommandLineOption megaOption("mega", "Create mega loot");
-    QCommandLineOption usernamesOption("create-usernames", "Create usernames database from network id");
+    QCommandLineOption usernamesOption("create-usernames", "Create usernames vector from network id");
+    QCommandLineOption subscriptionOption("create-subscription-template",
+                                          "Create subscription template from network id");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -220,7 +222,8 @@ int main(int argc, char* argv[]) {
                         dfsLimitOption,
                         blockDisableCompress,
                         megaOption,
-                        usernamesOption });
+                        usernamesOption,
+                        subscriptionOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -362,6 +365,19 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create usernames vector");
             } else
                 eSuccess("Usernames vector created");
+        }
+
+        bool subscription_create = parser.isSet(subscriptionOption);
+        if (subscription_create || isNewNetwork) {
+            auto res = node->create_subscription_template();
+
+            // temp
+            // node->create_subscription_vector("TestSubscription");
+
+            if (!res) {
+                eInfo("Can't create subscription template");
+            } else
+                eSuccess("Subscription template created");
         }
 
         bool is_mega = parser.isSet(megaOption);
