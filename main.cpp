@@ -71,13 +71,13 @@ static void HandleSignal(int sig) {
 #endif
         case SIGINT:
         case SIGTERM: {
-            eCritical("Signal achieved:  {}", strsignal(sig));
+            eCritical("Signal achieved: {}", strsignal(sig));
             QCoreApplication::quit();
             break;
         }
         case SIGABRT:
         case SIGSEGV: {
-            eCritical("Catch signal:  {}", strsignal(sig));
+            eCritical("Catch signal: {}", strsignal(sig));
 #ifdef Q_OS_WIN
             SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_DEBUG);
             if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
@@ -127,7 +127,7 @@ static void HandleSignal(int sig) {
             char** symbols    = backtrace_symbols(stackTrace, frameCount);
             if (symbols != nullptr) {
                 for (int i = 0; i < frameCount; ++i)
-                    eInfo("# {} :  {}", i, symbols[i]);
+                    eInfo("# {} : {}", i, symbols[i]);
                 free(symbols);
             }
 #endif
@@ -141,7 +141,7 @@ static void HandleSignal(int sig) {
             exit(EXIT_FAILURE);
         }
     } catch (const std::exception& ex) {
-        eCritical("SignalHandler exception:  {}", ex.what());
+        eCritical("SignalHandler exception: {}", ex.what());
         _exit(EXIT_FAILURE);
     }
 }
@@ -209,6 +209,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption usernamesOption("create-usernames", "Create usernames vector from network id");
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
+    QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -223,7 +224,8 @@ int main(int argc, char* argv[]) {
                         blockDisableCompress,
                         megaOption,
                         usernamesOption,
-                        subscriptionOption });
+                        subscriptionOption,
+                        chatOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -299,7 +301,7 @@ int main(int argc, char* argv[]) {
     nodeWrapper->Init(true);
 
     if (parser.isSet(blockDisableCompress)) {
-        node->blockchain()->getBlockIndex().setBlockCompress(false);
+        // node->blockchain()->getBlockIndex().setBlockCompress(false);
     }
 
     QObject::connect(node, &ExtraChainNode::NodeInitialised, [&]() {
@@ -376,12 +378,25 @@ int main(int argc, char* argv[]) {
 
             if (!res) {
                 eInfo("Can't create subscription template");
-            } else
+            } else {
                 eSuccess("Subscription template created");
+            }
+        }
+
+        bool chat_create = parser.isSet(chatOption);
+        if (chat_create || isNewNetwork) {
+            auto res = node->create_chat_templates();
+
+            if (!res) {
+                eInfo("Can't create chat templates");
+            } else {
+                eSuccess("Chat templates created");
+            }
         }
 
         bool is_mega = parser.isSet(megaOption);
         if (is_mega) {
+            /*
             Logger::instance().set_debug(true);
             auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->system_actor());
 
@@ -397,6 +412,7 @@ int main(int argc, char* argv[]) {
             eInfo("[MEGA] Create new zero block");
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
+            */
         }
         return;
     });

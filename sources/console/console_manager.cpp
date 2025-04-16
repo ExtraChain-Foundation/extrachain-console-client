@@ -29,8 +29,6 @@
 #include "managers/thread_pool.h"
 #include "network/network_manager.h"
 #include "network/isocket_service.h"
-#include "blockchain/blockchain.h"
-#include "managers/transaction_manager.h"
 
 #ifdef Q_OS_UNIX
     #include <unistd.h> // STDIN_FILENO
@@ -211,12 +209,12 @@ void ConsoleManager::commandReceiver(QString command) {
             }
 
             if (list[1] == "balance" || list[1] == "check_balance") {
-                const auto actors = node->actorIndex()->allActors();
-                for (int i = 0; i < actors.size(); i++) {
-                    const auto balance =
-                        node->blockchain()->calculate_actor_balance(ActorId(actors[i]), ActorId());
-                    eInfo("[Actor: {}, balance: ", actors[i], balance);
-                }
+                // const auto actors = node->actorIndex()->allActors();
+                // for (int i = 0; i < actors.size(); i++) {
+                //     const auto balance =
+                //         node->blockchain()->calculate_actor_balance(ActorId(actors[i]), ActorId());
+                //     eInfo("[Actor: {}, balance: ", actors[i], balance);
+                // }
             }
         }
     }
@@ -260,11 +258,11 @@ void ConsoleManager::commandReceiver(QString command) {
                 return;
             }
 
-            if (list.size() == 5) {
-                node->dfs()->exportFile(pathToNewFolder, pathToDfsFile, list[4].toStdString());
-            } else if (list.size() == 4) {
-                node->dfs()->exportFile(pathToNewFolder, pathToDfsFile);
-            }
+            // if (list.size() == 5) {
+            //     node->dfs()->exportFile(pathToNewFolder, pathToDfsFile, list[4].toStdString());
+            // } else if (list.size() == 4) {
+            //     node->dfs()->exportFile(pathToNewFolder, pathToDfsFile);
+            // }
         }
     }
 
@@ -302,14 +300,6 @@ void ConsoleManager::commandReceiver(QString command) {
             }
         }
         std::cout << "======================================================" << std::endl;
-    }
-    // request_coins coins
-    if (command.left(13) == "request_coins") {
-        auto actorId = node->accountController()->system_actor().id();
-        auto coins   = command.split(" ")[1];
-
-        eInfo("Request coins:  {} for  {}", coins, actorId.toQString());
-        // node->blockchain()->sendCoinReward(actorId, coins.toInt());
     }
 }
 
