@@ -206,10 +206,13 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     QCommandLineOption megaOption("mega", "Create mega loot");
+    QCommandLineOption tokenOption("create-token-cache", "Create token cache for network id");
     QCommandLineOption usernamesOption("create-usernames", "Create usernames vector from network id");
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
+
+    QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -222,10 +225,12 @@ int main(int argc, char* argv[]) {
                         netdebOption,
                         dfsLimitOption,
                         blockDisableCompress,
-                        megaOption,
+                        // megaOption,
+                        tokenOption,
                         usernamesOption,
                         subscriptionOption,
-                        chatOption });
+                        chatOption,
+                        megaImportOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -237,6 +242,11 @@ int main(int argc, char* argv[]) {
 
     if (parser.isSet(clearDataOption) || parser.isSet(core)) {
         Utils::wipeDataFiles();
+
+#ifndef QT_DEBUG
+        eCritical("You need to remove the console-data folder manually");
+        std::exit(0);
+#endif
     }
 
     //    QLockFile lockFile(".console.lock");
@@ -360,6 +370,23 @@ int main(int argc, char* argv[]) {
         }
 
         //
+        bool is_token = parser.isSet(tokenOption);
+        if (is_token || isNewNetwork) {
+            bool res1 = node->create_token_template();
+            if (res1) {
+                eSuccess("Tokens cache template created");
+
+                bool res2 = node->create_token_vector();
+                if (res2) {
+                    eSuccess("Tokens cache vector created");
+                } else {
+                    eInfo("Can't create tokens cache template");
+                }
+            } else {
+                eInfo("Can't create tokens cache vector");
+            }
+        }
+
         bool is_username = parser.isSet(usernamesOption);
         if (is_username || isNewNetwork) {
             auto res = node->create_usernames_vector();
@@ -394,7 +421,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        bool is_mega = parser.isSet(megaOption);
+        bool is_mega = false; // parser.isSet(megaOption);
         if (is_mega) {
             /*
             Logger::instance().set_debug(true);
@@ -413,6 +440,52 @@ int main(int argc, char* argv[]) {
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
             */
+        }
+
+        bool is_mega_import = parser.isSet(megaImportOption);
+        if (is_mega_import) {
+            if (node->dag()->current_section() != BigNumber(0)) {
+                eFatal("Last section must be 0");
+            }
+
+            DbConnector db("0");
+            if (!db.open()) {
+                eFatal("Can't open console-data/0 mega block");
+            }
+
+            auto rows          = db.select("SELECT * FROM GenesisDataRow");
+            auto network_actor = node->accountController()->currentProfile().get_actor(node->network_id()).value();
+            auto section       = node->dag()->read_section(BigNumber(0));
+
+            if (!section.has_value()) {
+                eFatal("No zero section");
+                return;
+            }
+
+            for (auto& row : rows) {
+                Transaction tx;
+                tx.setSender(node->network_id());
+                tx.setReceiver(ActorId(row["actorId"]));
+                tx.setAmount(BigNumberFloat(row["state"]));
+                tx.setToken(ActorId(row["token"]));
+                tx.setType(TransactionType::Balance);
+                tx.set_section(BigNumber(1));
+
+                if (section.has_value()) {
+                    tx.set_prev_hashs(section->hashs());
+                }
+
+                tx.set_timestamp(Utils::current_date_ms());
+
+                auto sign_res = tx.sign(network_actor.get());
+                if (!sign_res) {
+                    eFatal("Sign balance error");
+                    return;
+                }
+
+                Responder responder(node->network());
+                node->dag()->save_ransaction(tx);
+            }
         }
         return;
     });

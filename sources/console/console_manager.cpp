@@ -141,7 +141,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
             Transaction tx(mainActorId, receiver, amount);
             // createTransaction
-            node->sendTransaction(tx, node->accountController()->system_actor());
+            node->send_transaction(tx, node->accountController()->system_actor());
 
             //            if (mainActorId != firstId)
             //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());

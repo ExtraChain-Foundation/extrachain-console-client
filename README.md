@@ -70,7 +70,7 @@ Use something like:
     -DCMAKE_PREFIX_PATH=%YOUR QT PATH%/lib/cmake -DCMAKE_TOOLCHAIN_FILE=%YOUR VCPKG PATH%/scripts/buildsystems/vcpkg.cmake
 
 ### Qt Creator
-Open Tools → Options → Kits → %Your kit% → CMake Configuration → Change..., add CMAKE_TOOLCHAIN_FILE and save:
+Open Preferences → Kits → %Your kit% → CMake Configuration → Change..., add CMAKE_TOOLCHAIN_FILE and save:
 
     -DCMAKE_TOOLCHAIN_FILE:FILEPATH=%YOUR VCPKG PATH%/scripts/buildsystems/vcpkg.cmake
 
