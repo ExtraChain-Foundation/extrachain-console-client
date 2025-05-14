@@ -484,7 +484,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 Responder responder(node->network());
-                node->dag()->save_ransaction(tx);
+                node->dag()->save_transaction(tx);
             }
         }
         return;
