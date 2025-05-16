@@ -407,7 +407,7 @@ int main(int argc, char* argv[]) {
 
             eInfo("[MEGA] Data rows size: {}", mega->dataRows().size());
             eInfo("[MEGA Remove old blockchain");
-            node->blockchain()->removeAll(true);
+            node->blockchain()->removeAllSlot(true);
             eInfo("[MEGA] Create new zero block");
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
