@@ -396,7 +396,6 @@ int main(int argc, char* argv[]) {
 
         bool is_mega = parser.isSet(megaOption);
         if (is_mega) {
-            /*
             Logger::instance().set_debug(true);
             auto mega = node->blockchain()->create_mega_genesis_block(node->accountController()->system_actor());
 
@@ -412,7 +411,6 @@ int main(int argc, char* argv[]) {
             eInfo("[MEGA] Create new zero block");
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
-            */
         }
         return;
     });
