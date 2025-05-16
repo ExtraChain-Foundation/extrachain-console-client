@@ -493,6 +493,8 @@ int main(int argc, char* argv[]) {
                 node->dag()->save_transaction(tx);
             }
         }
+
+        node->dag()->set_status(DagStatus::Ready);
         return;
     });
 
