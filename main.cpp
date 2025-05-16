@@ -201,6 +201,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
+    QCommandLineOption dag_genesis("dag-genesis", "First dag creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
@@ -220,6 +221,7 @@ int main(int argc, char* argv[]) {
                         passOption,
                         inputOption,
                         core,
+                        dag_genesis,
                         clearDataOption,
                         importOption,
                         netdebOption,
@@ -367,6 +369,10 @@ int main(int argc, char* argv[]) {
                     eInfo("Error: No profiles files");
                 std::exit(-1);
             }
+        }
+
+        if (parser.isSet(dag_genesis)) {
+            node->create_new_dag();
         }
 
         //
