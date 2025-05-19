@@ -165,7 +165,43 @@ bool SetupSignals() {
     return true;
 }
 
+#include "headers/console/dag_merger.h"
+
 int main(int argc, char* argv[]) {
+    {
+        QCoreApplication app(argc, argv);
+
+        // Проверяем аргументы командной строки
+        if (argc < 3) {
+            qDebug() << "Usage: " << argv[0] << " <archives_directory> <result_directory>";
+            return 1;
+        }
+
+        QString archivesDir = argv[1];
+        QString resultDir   = argv[2];
+
+        // Проверяем существование директории с архивами
+        QDir dir(archivesDir);
+        if (!dir.exists()) {
+            qCritical() << "Archives directory does not exist:" << archivesDir;
+            return 1;
+        }
+
+        // Запускаем процесс объединения
+        try {
+            mergeDagFiles(archivesDir, resultDir);
+            qDebug() << "Merge completed successfully";
+        } catch (const std::exception& e) {
+            qCritical() << "Error during merge process:" << e.what();
+            return 1;
+        } catch (...) {
+            qCritical() << "Unknown error during merge process";
+            return 1;
+        }
+
+        return 0;
+    }
+
     QCoreApplication app(argc, argv);
 
     app.setApplicationName("ExtraChain Console Client");

@@ -16,6 +16,7 @@ set(EXTRACHAIN_CONSOLE_SOURCES
         headers/console/console_manager.h
         headers/console/push_manager.h
         headers/console/console_input.h
+        headers/console/dag_merger.h
         sources/console/console_manager.cpp
         sources/console/push_manager.cpp
         sources/console/console_input.cpp
