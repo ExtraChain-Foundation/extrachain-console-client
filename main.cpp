@@ -242,13 +242,13 @@ int main(int argc, char* argv[]) {
     QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
     Logger::start_file();
 
-    if (parser.isSet(clearDataOption) || parser.isSet(core)) {
-        Utils::wipeDataFiles();
-
+    if (parser.isSet(clearDataOption)) {
 #ifndef QT_DEBUG
-        eCritical("You need to remove the console-data folder manually");
+        eInfo("You need to remove the console-data folder manually");
         std::exit(0);
 #endif
+
+        Utils::wipeDataFiles();
     }
 
     //    QLockFile lockFile(".console.lock");
