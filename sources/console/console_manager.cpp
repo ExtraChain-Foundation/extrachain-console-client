@@ -23,10 +23,9 @@
 #include <QTextStream>
 
 #include "dfs/dfs_controller.h"
-#include "blockchain/actor_index.h"
+#include "chain/actor_index.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
-#include "managers/thread_pool.h"
 #include "network/network_manager.h"
 #include "network/isocket_service.h"
 
@@ -139,7 +138,10 @@ void ConsoleManager::commandReceiver(QString command) {
                 receiver = ActorId();
             }
 
-            Transaction tx(mainActorId, receiver, amount);
+            Transaction tx;
+            tx.set_sender(mainActorId);
+            tx.set_receiver(receiver);
+            tx.set_amount(amount);
             // createTransaction
             node->send_transaction(tx, node->accountController()->system_actor());
 

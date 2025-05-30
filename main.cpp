@@ -483,11 +483,11 @@ int main(int argc, char* argv[]) {
 
             for (auto& row : rows) {
                 Transaction tx;
-                tx.setSender(node->network_id());
-                tx.setReceiver(ActorId(row["actorId"]));
-                tx.setAmount(BigNumberFloat(row["state"]));
-                tx.setToken(ActorId(row["token"]));
-                tx.setType(TransactionType::Balance);
+                tx.set_sender(node->network_id());
+                tx.set_receiver(ActorId(row["actorId"]));
+                tx.set_amount(BigNumberFloat(row["state"]));
+                tx.set_token(ActorId(row["token"]));
+                tx.set_type(TransactionType::Balance);
                 tx.set_section(BigNumber(1));
 
                 if (section.has_value()) {
