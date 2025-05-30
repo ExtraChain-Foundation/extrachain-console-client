@@ -212,8 +212,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
-
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
+    QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -232,7 +232,8 @@ int main(int argc, char* argv[]) {
                         usernamesOption,
                         subscriptionOption,
                         chatOption,
-                        megaImportOption });
+                        megaImportOption,
+                        clearBalance });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -447,6 +448,18 @@ int main(int argc, char* argv[]) {
             qApp->exit();
             */
         }
+
+        bool is_local_clear_balance = parser.isSet(clearBalance);
+        if (is_local_clear_balance) {
+            eLog("Starting clear balances...");
+            auto actors = node->dag()->cache().local_clear_less_balances();
+            eLog("Done clear balances");
+            std::vector<ActorId> vec(actors.begin(), actors.end());
+            eLog("++++ {}", node->dag()->calculate_actors_balance(vec));
+        }
+
+        // eLog("++++ {}",
+        // node->dag()->calculate_actors_balance({ ActorId("1a902514053b9f2c814621799acbbef21e2ff6a5") }));
 
         bool is_mega_import = parser.isSet(megaImportOption);
         if (is_mega_import) {
