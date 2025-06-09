@@ -22,6 +22,7 @@
 #include <QProcess>
 #include <QTextStream>
 
+#include "managers/thread_pool.h"
 #include "dfs/dfs_controller.h"
 #include "chain/actor_index.h"
 #include "managers/extrachain_node.h"
