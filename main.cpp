@@ -167,11 +167,10 @@ bool SetupSignals() {
 
 int main(int argc, char* argv[]) {
 #ifdef Q_OS_LINUX
-        struct sigaction sa;
-    sa.sa_handler = SIG_IGN;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGPIPE, &sa, nullptr);
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &set, nullptr);
 #endif
 
     QCoreApplication app(argc, argv);
