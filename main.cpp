@@ -166,6 +166,8 @@ bool SetupSignals() {
 }
 
 int main(int argc, char* argv[]) {
+    Utils::prepare_extrachain();
+
     QCoreApplication app(argc, argv);
 
     app.setApplicationName("ExtraChain Console Client");
