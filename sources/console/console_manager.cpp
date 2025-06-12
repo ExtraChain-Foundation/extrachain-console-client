@@ -352,14 +352,14 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
 
 void ConsoleManager::dfsStart() {
     connect(node->dfs(), &DfsController::added, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Added for {}: {}", owner_id, dirRow);
+        eInfo("[Console/Dfs] Added for {}: {}", owner_id, dirRow);
     });
     connect(node->dfs(), &DfsController::uploaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Uploaded for {}: {}", owner_id, dirRow);
+        eInfo("[Console/Dfs] Uploaded for {}: {}", owner_id, dirRow);
     });
 
     connect(node->dfs(), &DfsController::downloaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Downloaded for {}: {}", owner_id, dirRow);
+        eInfo("[Console/Dfs] Downloaded for {}: {}", owner_id, dirRow);
     });
 
     connect(node->dfs(),

@@ -166,12 +166,7 @@ bool SetupSignals() {
 }
 
 int main(int argc, char* argv[]) {
-#ifdef Q_OS_LINUX
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGPIPE);
-    pthread_sigmask(SIG_BLOCK, &set, nullptr);
-#endif
+    Utils::prepare_extrachain();
 
     QCoreApplication app(argc, argv);
 
