@@ -166,6 +166,14 @@ bool SetupSignals() {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef Q_OS_LINUX
+        struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGPIPE, &sa, nullptr);
+#endif
+
     QCoreApplication app(argc, argv);
 
     app.setApplicationName("ExtraChain Console Client");
