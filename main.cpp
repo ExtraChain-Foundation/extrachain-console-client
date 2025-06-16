@@ -26,6 +26,7 @@
 
 #include <csignal>
 
+#include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
@@ -216,6 +217,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
+    QCommandLineOption dfsLight("dfs-light", "Start with light Dfs");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -235,7 +237,8 @@ int main(int argc, char* argv[]) {
                         subscriptionOption,
                         chatOption,
                         megaImportOption,
-                        clearBalance });
+                        clearBalance,
+                        dfsLight });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -339,6 +342,10 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create new network");
                 std::exit(0);
             }
+        }
+
+        if (parser.isSet(dfsLight)) {
+            nodeWrapper->node->dfs()->set_mode(DfsMode::Light);
         }
 
         QString importFile = parser.value(importOption);
