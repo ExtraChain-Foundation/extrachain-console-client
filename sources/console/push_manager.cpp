@@ -21,7 +21,7 @@
 
 #include <QJsonObject>
 
-#include "blockchain/actor_index.h"
+#include "chain/actor_index.h"
 
 PushManager::PushManager(ExtraChainNode *node, QObject *parent)
     : QObject(parent) {

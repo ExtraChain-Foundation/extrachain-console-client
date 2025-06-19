@@ -26,6 +26,7 @@
 
 #include <csignal>
 
+#include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
@@ -171,7 +172,6 @@ int main(int argc, char* argv[]) {
     {
         QCoreApplication app(argc, argv);
 
-        // Проверяем аргументы командной строки
         if (argc < 3) {
             qDebug() << "Usage: " << argv[0] << " <archives_directory> <result_directory>";
             return 1;
@@ -180,14 +180,12 @@ int main(int argc, char* argv[]) {
         QString archivesDir = argv[1];
         QString resultDir   = argv[2];
 
-        // Проверяем существование директории с архивами
         QDir dir(archivesDir);
         if (!dir.exists()) {
             qCritical() << "Archives directory does not exist:" << archivesDir;
             return 1;
         }
 
-        // Запускаем процесс объединения
         try {
             mergeDagFiles(archivesDir, resultDir);
             qDebug() << "Merge completed successfully";
@@ -201,6 +199,8 @@ int main(int argc, char* argv[]) {
 
         return 0;
     }
+
+    Utils::prepare_extrachain();
 
     QCoreApplication app(argc, argv);
 
@@ -248,8 +248,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
-
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
+    QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
+    QCommandLineOption dfsLight("dfs-light", "Start with light Dfs");
 
     parser.addOptions({ debugOption,
                         dirOption,
@@ -268,7 +269,9 @@ int main(int argc, char* argv[]) {
                         usernamesOption,
                         subscriptionOption,
                         chatOption,
-                        megaImportOption });
+                        megaImportOption,
+                        clearBalance,
+                        dfsLight });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -278,13 +281,13 @@ int main(int argc, char* argv[]) {
     QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
     Logger::start_file();
 
-    if (parser.isSet(clearDataOption) || parser.isSet(core)) {
-        Utils::wipeDataFiles();
-
+    if (parser.isSet(clearDataOption)) {
 #ifndef QT_DEBUG
-        eCritical("You need to remove the console-data folder manually");
+        eInfo("You need to remove the console-data folder manually");
         std::exit(0);
 #endif
+
+        Utils::wipeDataFiles();
     }
 
     //    QLockFile lockFile(".console.lock");
@@ -372,6 +375,10 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create new network");
                 std::exit(0);
             }
+        }
+
+        if (parser.isSet(dfsLight)) {
+            nodeWrapper->node->dfs()->set_mode(DfsMode::Light);
         }
 
         QString importFile = parser.value(importOption);
@@ -484,6 +491,18 @@ int main(int argc, char* argv[]) {
             */
         }
 
+        bool is_local_clear_balance = parser.isSet(clearBalance);
+        if (is_local_clear_balance) {
+            eLog("Starting clear balances...");
+            auto actors = node->dag()->cache().local_clear_less_balances();
+            eLog("Done clear balances");
+            std::vector<ActorId> vec(actors.begin(), actors.end());
+            eLog("++++ {}", node->dag()->calculate_actors_balance(vec));
+        }
+
+        // eLog("++++ {}",
+        // node->dag()->calculate_actors_balance({ ActorId("1a902514053b9f2c814621799acbbef21e2ff6a5") }));
+
         bool is_mega_import = parser.isSet(megaImportOption);
         if (is_mega_import) {
             if (node->dag()->current_section() != BigNumber(0)) {
@@ -506,11 +525,11 @@ int main(int argc, char* argv[]) {
 
             for (auto& row : rows) {
                 Transaction tx;
-                tx.setSender(node->network_id());
-                tx.setReceiver(ActorId(row["actorId"]));
-                tx.setAmount(BigNumberFloat(row["state"]));
-                tx.setToken(ActorId(row["token"]));
-                tx.setType(TransactionType::Balance);
+                tx.set_sender(node->network_id());
+                tx.set_receiver(ActorId(row["actorId"]));
+                tx.set_amount(BigNumberFloat(row["state"]));
+                tx.set_token(ActorId(row["token"]));
+                tx.set_type(TransactionType::Balance);
                 tx.set_section(BigNumber(1));
 
                 if (section.has_value()) {

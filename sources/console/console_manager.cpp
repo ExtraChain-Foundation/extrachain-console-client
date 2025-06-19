@@ -22,11 +22,11 @@
 #include <QProcess>
 #include <QTextStream>
 
+#include "managers/thread_pool.h"
 #include "dfs/dfs_controller.h"
-#include "blockchain/actor_index.h"
+#include "chain/actor_index.h"
 #include "managers/extrachain_node.h"
 #include "managers/logs_manager.h"
-#include "managers/thread_pool.h"
 #include "network/network_manager.h"
 #include "network/isocket_service.h"
 
@@ -139,7 +139,10 @@ void ConsoleManager::commandReceiver(QString command) {
                 receiver = ActorId();
             }
 
-            Transaction tx(mainActorId, receiver, amount);
+            Transaction tx;
+            tx.set_sender(mainActorId);
+            tx.set_receiver(receiver);
+            tx.set_amount(amount);
             // createTransaction
             node->send_transaction(tx, node->accountController()->system_actor());
 
@@ -349,14 +352,14 @@ void ConsoleManager::saveNotificationToken(QByteArray os, ActorId actorId, Actor
 
 void ConsoleManager::dfsStart() {
     connect(node->dfs(), &DfsController::added, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Added for {}: {}", owner_id, dirRow);
+        eLog("[Console/Dfs] Added for {}: {}", owner_id, dirRow);
     });
     connect(node->dfs(), &DfsController::uploaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Uploaded for {}: {}", owner_id, dirRow);
+        eLog("[Console/Dfs] Uploaded for {}: {}", owner_id, dirRow);
     });
 
     connect(node->dfs(), &DfsController::downloaded, [](ActorId owner_id, Dfs::DirRow dirRow) {
-        eInfo("[Console/Ddf] Downloaded for {}: {}", owner_id, dirRow);
+        eLog("[Console/Dfs] Downloaded for {}: {}", owner_id, dirRow);
     });
 
     connect(node->dfs(),
