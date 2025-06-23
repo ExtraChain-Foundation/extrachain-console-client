@@ -197,7 +197,7 @@ int main(int argc, char* argv[]) {
     parser.addHelpOption();
     parser.addVersionOption();
 
-    QCommandLineOption debugOption("debug", "Enable debug logs");
+    QCommandLineOption debugLogsOption("debug-logs", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
     QCommandLineOption emailOption({ "e", "email" }, "Set email", "email");
@@ -217,9 +217,10 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
-    QCommandLineOption dfsLight("dfs-light", "Start with light Dfs");
+    QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light");
+    QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light");
 
-    parser.addOptions({ debugOption,
+    parser.addOptions({ debugLogsOption,
                         dirOption,
                         emailOption,
                         passOption,
@@ -238,7 +239,8 @@ int main(int argc, char* argv[]) {
                         chatOption,
                         megaImportOption,
                         clearBalance,
-                        dfsLight });
+                        dagMode,
+                        dfsMode });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -267,13 +269,13 @@ int main(int argc, char* argv[]) {
     //        return -1;
     //    }
 
-    LogsManager::debugLogs = parser.isSet(debugOption);
+    LogsManager::debugLogs = parser.isSet(debugLogsOption);
 #ifdef QT_DEBUG
-    LogsManager::debugLogs = !parser.isSet(debugOption);
+    LogsManager::debugLogs = !parser.isSet(debugLogsOption);
     Network::networkDebug  = parser.isSet(netdebOption);
     eInfo("Debug logs enabled: {}", LogsManager::debugLogs);
 #endif
-    Logger::instance().set_debug(LogsManager::debugLogs);
+    Logger::instance().set_debug(true); // LogsManager::debugLogs);
 
     LogsManager::onFile();
 
@@ -344,8 +346,18 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        if (parser.isSet(dfsLight)) {
+        auto dagModeStr = parser.value(dagMode);
+        if (dagModeStr.toLower() == "light") {
+            nodeWrapper->node->dag()->set_mode(DagMode::Light);
+        } else {
+            nodeWrapper->node->dag()->set_mode(DagMode::Full);
+        }
+
+        auto dfsModeStr = parser.value(dfsMode);
+        if (dfsModeStr.toLower() == "light") {
             nodeWrapper->node->dfs()->set_mode(DfsMode::Light);
+        } else {
+            nodeWrapper->node->dfs()->set_mode(DfsMode::Full);
         }
 
         QString importFile = parser.value(importOption);
