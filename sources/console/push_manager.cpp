@@ -187,44 +187,44 @@ QString PushManager::notificationToMessage(const Notification &notification) {
     QString    message;
     QByteArray userId;
 
-    switch (notification.type) {
-    case (Notification::NotifyType::TxToUser):
-        message = "Transaction to *" + notification.data.right(5) + " completed";
-        userId  = "";
-        break;
-    case (Notification::NotifyType::TxToMe):
-        message = "New transaction from *" + notification.data.right(5);
-        userId  = "";
-        break;
-    case (Notification::NotifyType::ChatMsg): {
-        QByteArray chatId = notification.data.split(' ').at(0);
-        message           = "New message from ";
-        userId            = chatId;
-        break;
-    }
-    case (Notification::NotifyType::ChatInvite): {
-        QByteArray user = notification.data.split(' ').at(0);
-        message         = "New chat from ";
-        userId          = user;
-        break;
-    }
-    case (Notification::NotifyType::NewPost): {
-        QByteArray user = notification.data.split(' ').at(0);
-        message         = "New post from ";
-        userId          = user;
-        break;
-    }
-    case (Notification::NotifyType::NewEvent): {
-        QByteArray user = notification.data.split(' ').at(0);
-        message         = "New event from ";
-        userId          = user;
-        break;
-    }
-    case (Notification::NotifyType::NewFollower):
-        message = "New follower ";
-        userId  = notification.data;
-        break;
-    }
+    // switch (notification.type) {
+    // case (Notification::NotifyType::TxToUser):
+    //     message = "Transaction to *" + notification.data.right(5) + " completed";
+    //     userId  = "";
+    //     break;
+    // case (Notification::NotifyType::TxToMe):
+    //     message = "New transaction from *" + notification.data.right(5);
+    //     userId  = "";
+    //     break;
+    // case (Notification::NotifyType::ChatMsg): {
+    //     QByteArray chatId = notification.data.split(' ').at(0);
+    //     message           = "New message from ";
+    //     userId            = chatId;
+    //     break;
+    // }
+    // case (Notification::NotifyType::ChatInvite): {
+    //     QByteArray user = notification.data.split(' ').at(0);
+    //     message         = "New chat from ";
+    //     userId          = user;
+    //     break;
+    // }
+    // case (Notification::NotifyType::NewPost): {
+    //     QByteArray user = notification.data.split(' ').at(0);
+    //     message         = "New post from ";
+    //     userId          = user;
+    //     break;
+    // }
+    // case (Notification::NotifyType::NewEvent): {
+    //     QByteArray user = notification.data.split(' ').at(0);
+    //     message         = "New event from ";
+    //     userId          = user;
+    //     break;
+    // }
+    // case (Notification::NotifyType::NewFollower):
+    //     message = "New follower ";
+    //     userId  = notification.data;
+    //     break;
+    // }
 
     if (userId.isEmpty())
         return message;

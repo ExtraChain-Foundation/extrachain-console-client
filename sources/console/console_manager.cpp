@@ -224,9 +224,9 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(4) == "push") {
         command.replace(QRegularExpression("\\s+"), " ");
-        QString      actorId = command.mid(5, 40);
-        Notification notify { .time = 100, .type = Notification::NewPost, .data = actorId.toLatin1() + " " };
-        m_pushManager->pushNotification(actorId, notify);
+        QString actorId = command.mid(5, 40);
+        // Notification notify { .time = 100, .type = Notification::NewPost, .data = actorId.toLatin1() + " " };
+        // m_pushManager->pushNotification(actorId, notify);
     }
 
     if (command.left(8) == "dfs add ") {
