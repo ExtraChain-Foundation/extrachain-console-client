@@ -217,8 +217,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
-    QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light");
-    QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light");
+    QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
+    QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -328,6 +328,8 @@ int main(int argc, char* argv[]) {
         eLog("[Console] Activated");
         console.setExtraChainNode(node);
         console.dfsStart();
+
+        // node->dag()->tx_list_log(ActorId(""));
 
         QString dfsLimit = parser.value(dfsLimitOption);
         if (!dfsLimit.isEmpty()) {
