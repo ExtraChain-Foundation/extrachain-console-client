@@ -35,6 +35,8 @@
 #include "utils/exc_logs.h"
 #include "metatypes.h"
 
+#include "console/console_api.h"
+
 #ifdef Q_OS_LINUX
     #include <execinfo.h>
 #endif
@@ -529,8 +531,15 @@ int main(int argc, char* argv[]) {
                 node->dag()->save_transaction(tx);
             }
         }
+
+        // node->dag()->tx_list_log(ActorId("1d8faf78ba43b008de6ec0f15f0ab635c1ade24e"));
+        node->dag()->cache_log();
+        // node->dag()->last_month();
+        // node->dag()->sum();
         return;
     });
+
+    // run_api(node);
 
     return app.exec();
 }
