@@ -36,6 +36,8 @@
 #include "utils/exc_logs.h"
 #include "metatypes.h"
 
+#include "console/console_api.h"
+
 #ifdef Q_OS_LINUX
     #include <execinfo.h>
 #endif
@@ -578,9 +580,10 @@ int main(int argc, char* argv[]) {
 
         // node->dag()->sum_all_rewards();
         // node->dag()->cache_log();
-
         return;
     });
+
+    // run_api(node);
 
     return app.exec();
 }

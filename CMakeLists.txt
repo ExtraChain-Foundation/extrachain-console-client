@@ -12,13 +12,17 @@ include(../extrachain-core/CMakeLists.txt)
 # )
 # FetchContent_MakeAvailable(googletest)
 
+find_package(Crow CONFIG REQUIRED)
+
 set(EXTRACHAIN_CONSOLE_SOURCES
         headers/console/console_manager.h
         headers/console/push_manager.h
         headers/console/console_input.h
+        headers/console/console_api.h
         sources/console/console_manager.cpp
         sources/console/push_manager.cpp
         sources/console/console_input.cpp
+        sources/console/console_api.cpp
         main.cpp
 )
 
@@ -39,7 +43,7 @@ string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
 string(STRIP "${GIT_BRANCH}" GIT_BRANCH)
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain)
+target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain Crow::Crow asio::asio)
 
 if(UNIX AND NOT APPLE) # LINUX
     target_link_libraries(extrachain-console PRIVATE stdc++exp backtrace)
