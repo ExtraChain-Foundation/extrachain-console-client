@@ -215,10 +215,12 @@ int main(int argc, char* argv[]) {
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
+    QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
+    QCommandLineOption regenControls("regen-controls", "Regerarate controls");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -240,7 +242,8 @@ int main(int argc, char* argv[]) {
                         megaImportOption,
                         clearBalance,
                         dagMode,
-                        dfsMode });
+                        dfsMode,
+                        regenControls });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -422,8 +425,19 @@ int main(int argc, char* argv[]) {
             auto res = node->create_usernames_vector();
             if (!res) {
                 eInfo("Can't create usernames vector");
-            } else
+            } else {
                 eSuccess("Usernames vector created");
+            }
+        }
+
+        bool is_renames = parser.isSet(renamesOption);
+        if (is_username || isNewNetwork) {
+            auto res = node->create_renames_template();
+            if (!res) {
+                eInfo("Can't create renames vector template");
+            } else {
+                eSuccess("Renames vector template created");
+            }
         }
 
         bool subscription_create = parser.isSet(subscriptionOption);
@@ -529,6 +543,12 @@ int main(int argc, char* argv[]) {
                 node->dag()->save_transaction(tx);
             }
         }
+
+        if (parser.isSet(regenControls)) {
+            node->dag()->clear_controls();
+            node->dag()->generate_hash();
+        }
+
         return;
     });
 
