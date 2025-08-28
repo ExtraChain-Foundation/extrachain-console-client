@@ -243,7 +243,8 @@ int main(int argc, char* argv[]) {
                         clearBalance,
                         dagMode,
                         dfsMode,
-                        regenControls });
+                        regenControls,
+                        renamesOption });
     parser.process(app);
 
     // TODO: allow absolute directory
