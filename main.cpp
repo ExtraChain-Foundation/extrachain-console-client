@@ -432,7 +432,7 @@ int main(int argc, char* argv[]) {
         }
 
         bool is_renames = parser.isSet(renamesOption);
-        if (is_username || isNewNetwork) {
+        if (is_renames || isNewNetwork) {
             auto res = node->create_renames_template();
             if (!res) {
                 eInfo("Can't create renames vector template");
