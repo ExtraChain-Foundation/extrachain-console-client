@@ -215,10 +215,12 @@ int main(int argc, char* argv[]) {
     QCommandLineOption subscriptionOption("create-subscription-template",
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
+    QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
+    QCommandLineOption regenControls("regen-controls", "Regerarate controls");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -240,7 +242,9 @@ int main(int argc, char* argv[]) {
                         megaImportOption,
                         clearBalance,
                         dagMode,
-                        dfsMode });
+                        dfsMode,
+                        regenControls,
+                        renamesOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -422,8 +426,19 @@ int main(int argc, char* argv[]) {
             auto res = node->create_usernames_vector();
             if (!res) {
                 eInfo("Can't create usernames vector");
-            } else
+            } else {
                 eSuccess("Usernames vector created");
+            }
+        }
+
+        bool is_renames = parser.isSet(renamesOption);
+        if (is_renames || isNewNetwork) {
+            auto res = node->create_renames_template();
+            if (!res) {
+                eInfo("Can't create renames vector template");
+            } else {
+                eSuccess("Renames vector template created");
+            }
         }
 
         bool subscription_create = parser.isSet(subscriptionOption);
@@ -486,7 +501,7 @@ int main(int argc, char* argv[]) {
 
         bool is_mega_import = parser.isSet(megaImportOption);
         if (is_mega_import) {
-            if (node->dag()->current_section() != BigNumber(0)) {
+            if (node->dag()->current_section() != SectionId(0)) {
                 eFatal("Last section must be 0");
             }
 
@@ -497,7 +512,7 @@ int main(int argc, char* argv[]) {
 
             auto rows          = db.select("SELECT * FROM GenesisDataRow");
             auto network_actor = node->accountController()->currentProfile().get_actor(node->network_id()).value();
-            auto section       = node->dag()->read_section(BigNumber(0));
+            auto section       = node->dag()->read_section(SectionId(0));
 
             if (!section.has_value()) {
                 eFatal("No zero section");
@@ -511,7 +526,7 @@ int main(int argc, char* argv[]) {
                 tx.set_amount(BigNumberFloat(row["state"]));
                 tx.set_token(ActorId(row["token"]));
                 tx.set_type(TransactionType::Balance);
-                tx.set_section(BigNumber(1));
+                tx.set_section(SectionId(1));
 
                 if (section.has_value()) {
                     tx.set_prev_hashs(section->hashs());
@@ -529,6 +544,12 @@ int main(int argc, char* argv[]) {
                 node->dag()->save_transaction(tx);
             }
         }
+
+        if (parser.isSet(regenControls)) {
+            node->dag()->clear_controls();
+            node->dag()->generate_hash();
+        }
+
         return;
     });
 
