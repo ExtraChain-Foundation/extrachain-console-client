@@ -25,6 +25,7 @@
 
 #include "managers/extrachain_node.h"
 #include "chain/dag.h"
+#include "dfs/dfs_controller.h"
 
 long long parseTimeToMs(const std::string& time_str) {
     if (time_str.empty())
@@ -52,11 +53,26 @@ long long parseTimeToMs(const std::string& time_str) {
 
 void run_api(ExtraChainNode* node) {
     crow::SimpleApp app;
+    std::string     token_session = "26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c";
 
-    CROW_ROUTE(app, "/balance").methods("POST"_method)([&node](const crow::request& req) {
+    auto contains = [&](std::vector<std::string> fields, const std::string& value) {
+        return std::find(fields.begin(), fields.end(), value) != fields.end();
+    };
+
+    CROW_ROUTE(app, "/balance").methods("POST"_method)([&node, &token_session](const crow::request& req) {
         auto json = crow::json::load(req.body);
+
         if (!json || !json.has("actor_id")) {
             return crow::response(400, R"({"error": "actor_id required"})");
+        }
+
+        std::string token = std::string(json["token"].s());
+        if (!json.has("token") || token.empty()) {
+            return crow::response(400, R"({"error": "missing or empty token."})");
+        }
+
+        if (token != token_session) {
+            return crow::response(400, R"({"error": "token is not valid."})");
         }
 
         std::string actorIdStr = json["actor_id"].s();
@@ -87,10 +103,163 @@ void run_api(ExtraChainNode* node) {
         return crow::response(200, response);
     });
 
-    CROW_ROUTE(app, "/have_rewards").methods("POST"_method)([&node](const crow::request& req) {
+    // section_id and hash
+    CROW_ROUTE(app, "/transaction_by_hash_and_section_id")
+        .methods("POST"_method)([&node, &token_session](const crow::request& req) {
+            auto json = crow::json::load(req.body);
+            if (!json || !json.has("hash")) {
+                return crow::response(400, R"({"error": "hash required"})");
+            }
+
+            if (!json.has("section_id")) {
+                return crow::response(400, R"({"error": "section_id required"})");
+            }
+
+            if (!json.has("token")) {
+                return crow::response(400, R"({"error": "token required"})");
+            }
+
+            std::string token = std::string(json["token"].s());
+            if (token.empty()) {
+                return crow::response(400, R"({"error": "token empty."})");
+            }
+
+            if (token != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+            std::string hash          = json["hash"].s();
+            int         sectionNumber = json["section_id"].i();
+            auto        section       = node->dag()->read_section(SectionId(sectionNumber));
+            auto        transactions  = section->transactions;
+            if (transactions.empty()) {
+                return crow::response(400, fmt::format(R"({{"error": "list transactions is empty"}})"));
+            }
+
+            auto it = std::find_if(transactions.begin(), transactions.end(), [&hash](const Transaction& t) {
+                return t.hash() == hash;
+            });
+
+            if (it != transactions.end()) {
+                Transaction        tx = *it;
+                crow::json::wvalue response;
+                response["hash"]     = hash;
+                response["sender"]   = tx.sender().to_string();
+                response["receiver"] = tx.receiver().to_string();
+                response["amount"]   = tx.amount().to_string(NumeralBase::Dec);
+                auto dateTime        = QDateTime::fromMSecsSinceEpoch(tx.timestamp());
+                response["date"]     = dateTime.toString("dd/MM/yyyy").toStdString();
+                response["time"]     = dateTime.toString("hh:mm:ss").toStdString();
+                std::string typeTx;
+                switch (tx.type()) {
+                case TransactionType::Genesis:
+                    typeTx = "genesis";
+                    break;
+                case TransactionType::Balance:
+                    typeTx = "balance";
+                    break;
+                case TransactionType::Burn:
+                    typeTx = "burn";
+                    break;
+                case TransactionType::InitContract:
+                    typeTx = "init_contract";
+                    break;
+                case TransactionType::Conversion:
+                    typeTx = "conversion";
+                    break;
+                case TransactionType::Regular:
+                    typeTx = "regular";
+                    break;
+                case TransactionType::Repeatable:
+                    typeTx = "repeatable";
+                    break;
+                case TransactionType::Reward:
+                    typeTx = "reward";
+                    break;
+                default:
+                    break;
+                }
+                response["type"] = typeTx;
+
+                return crow::response(200, response);
+            }
+
+            return crow::response(400, fmt::format(R"({{"error": "can not found transaction."}})"));
+        });
+
+    CROW_ROUTE(app, "/count_sections")
+        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
+            auto keys = req.url_params.keys();
+            if (!contains(keys, "token")) {
+                return crow::response(400, R"({"error": "token required"})");
+            }
+
+            auto        token_param = req.url_params.get("token");
+            std::string token       = std::string(token_param);
+            if (token.empty()) {
+                return crow::response(400, R"({"error": "token is empty."})");
+            }
+
+            if (token != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+            crow::json::wvalue response;
+            response["count_sections"] = node->dag()->current_section().to_string(NumeralBase::Dec);
+            return crow::response(200, response);
+        });
+
+    CROW_ROUTE(app, "/count_transactions_in_section")
+        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
+            auto keys = req.url_params.keys();
+
+            if (!contains(keys, "number_section") || !contains(keys, "token")) {
+                return crow::response(400, R"({"error": "number_section and token required"})");
+            }
+
+            auto number_section = req.url_params.get("number_section");
+            auto token_param    = req.url_params.get("token");
+            if (!number_section) {
+                return crow::response(400, R"({"error": "number_section required"})");
+            }
+
+            int  section_number = std::stoi(number_section);
+            auto section        = node->dag()->read_section(BigNumber(section_number));
+
+            if (!section.has_value()) {
+                return crow::response(400, R"({"error": "invalid number section"})");
+            }
+
+            std::string token = std::string(token_param);
+            if (token.empty()) {
+                return crow::response(400, R"({"error": "token is empty."})");
+            }
+
+            if (token != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+            auto countTx = section->transactions.size();
+
+            crow::json::wvalue response;
+            response["count_transactions"] = countTx;
+            response["section_number"]     = number_section;
+
+            return crow::response(200, response);
+        });
+
+    CROW_ROUTE(app, "/have_rewards").methods("POST"_method)([&node, &token_session](const crow::request& req) {
         auto json = crow::json::load(req.body);
         if (!json || !json.has("actor_id")) {
             return crow::response(400, R"({"error": "actor_id required"})");
+        }
+
+        std::string token = std::string(json["token"].s());
+        if (!json.has("token") || token.empty()) {
+            return crow::response(400, R"({"error": "missing or empty token."})");
+        }
+
+        if (token != token_session) {
+            return crow::response(400, R"({"error": "token is not valid."})");
         }
 
         std::string actorId  = json["actor_id"].s();
@@ -119,7 +288,7 @@ void run_api(ExtraChainNode* node) {
             for (const auto& tx : section.value().transactions) {
                 if (tx.type() == TransactionType::Reward) {
                     // Получаем время транзакции (нужно реализовать tx.timestamp() или подобное)
-                    auto txTime       = tx.timestamp(); // предполагаем что возвращает std::chrono::milliseconds
+                    auto txTime = tx.timestamp(); // предполагаем что возвращает std::chrono::milliseconds
                     auto cutoffTimeMs = static_cast<std::uint64_t>(now.count() - periodMs);
 
                     if (txTime >= cutoffTimeMs) {
@@ -146,6 +315,61 @@ void run_api(ExtraChainNode* node) {
 
         return crow::response(200, response);
     });
+
+    CROW_ROUTE(app, "/subscription_state")
+        .methods("POST"_method)([&node, &token_session](const crow::request& req) {
+            auto json = crow::json::load(req.body);
+            if (!json || !json.has("actor_id")) {
+                return crow::response(400, R"({"error": "actor_id required"})");
+            }
+
+            std::string actorId = json["actor_id"].s();
+
+            auto actor_id = ActorId::create(actorId);
+            if (!actor_id.has_value()) {
+                return crow::response(400, R"({"error": "invalid actor_id"})");
+            }
+
+            std::string token = std::string(json["token"].s());
+            if (!json.has("token") || token.empty()) {
+                return crow::response(400, R"({"error": "missing or empty token."})");
+            }
+
+            if (token != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+            auto raccoon_id = ActorId("46710a2d823c23db9fc2ac01e0f84212a8128373");
+
+            auto search_result =
+                Dfs::Tables::ActorDirFile::search_file_by_folder_and_name(raccoon_id,
+                                                                          Dfs::Basic::TEMPLATE_VECTOR,
+                                                                          "RaccoonSubscription");
+            if (!search_result.has_value()) {
+                return crow::response(400, R"({"error": "can not find subscription"})");
+            }
+
+            std::string sub_file_id     = search_result->file_id;
+            bool        subscribeActive = false;
+            bool        subscribed      = false;
+
+            if (search_result->state == Dfs::FileState::Ready) {
+                subscribeActive = true;
+            }
+
+            auto row = node->dfs()->get_vector_row(raccoon_id, sub_file_id, actor_id->to_string());
+
+            if (subscribed != row.has_value()) {
+                subscribed = row.has_value();
+            }
+
+            crow::json::wvalue response;
+            response["actor_id"]   = actor_id.value().to_string();
+            response["active"]     = subscribeActive;
+            response["subscribed"] = subscribed;
+
+            return crow::response(200, response);
+        });
 
     std::uint16_t port = 8080;
     app.port(port).concurrency(2).run();

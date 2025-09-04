@@ -583,7 +583,7 @@ int main(int argc, char* argv[]) {
         return;
     });
 
-    // run_api(node);
+    run_api(node);
 
     return app.exec();
 }
