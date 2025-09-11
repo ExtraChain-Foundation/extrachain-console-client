@@ -4,6 +4,7 @@ project(extrachain-console LANGUAGES C CXX VERSION 1.0)
 
 set(EXTRACHAIN_STATIC_BUILD true)
 include(../extrachain-core/CMakeLists.txt)
+set(RUN_API TRUE)
 
 # include(FetchContent)
 # FetchContent_Declare(
@@ -34,6 +35,7 @@ add_executable(extrachain-console
         ${EXTRACHAIN_CONSOLE_SOURCES}
 )
 
+add_compile_definitions(RUN_API="${RUN_API}")
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
 # git

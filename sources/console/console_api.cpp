@@ -54,6 +54,7 @@ long long parseTimeToMs(const std::string& time_str) {
 void run_api(ExtraChainNode* node) {
     crow::SimpleApp app;
     std::string     token_session = "26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c";
+    eLog("API runned.");
 
     auto contains = [&](std::vector<std::string> fields, const std::string& value) {
         return std::find(fields.begin(), fields.end(), value) != fields.end();
@@ -88,6 +89,8 @@ void run_api(ExtraChainNode* node) {
 
         std::map<std::pair<ActorId, TokenId>, BigNumberFloat> balances =
             node->dag()->calculate_actors_balance({ actor_id.value() });
+
+        eLog("[api] [POST] [transaction_by_hash_and_section_id] [actor_id: {}]", actorIdStr);
 
         BigNumberFloat balance    = BigNumberFloat(0); // default
         auto           balanceKey = std::make_pair(actor_id.value(), tokenId);
@@ -135,6 +138,8 @@ void run_api(ExtraChainNode* node) {
             if (transactions.empty()) {
                 return crow::response(400, fmt::format(R"({{"error": "list transactions is empty"}})"));
             }
+
+            eLog("[api] [POST] [transaction_by_hash_and_section_id] [hash: {}]", hash);
 
             auto it = std::find_if(transactions.begin(), transactions.end(), [&hash](const Transaction& t) {
                 return t.hash() == hash;
@@ -203,6 +208,7 @@ void run_api(ExtraChainNode* node) {
             if (token != token_session) {
                 return crow::response(400, R"({"error": "token is not valid."})");
             }
+            eLog("[api] [GET] [count_sections]");
             crow::json::wvalue response;
             response["count_sections"] = node->dag()->current_section().to_string(NumeralBase::Dec);
             return crow::response(200, response);
@@ -238,6 +244,7 @@ void run_api(ExtraChainNode* node) {
                 return crow::response(400, R"({"error": "token is not valid."})");
             }
 
+            eLog("[api] [GET] [count_transactions_in_section] [number_section: {}]", number_section);
             auto countTx = section->transactions.size();
 
             crow::json::wvalue response;
@@ -357,6 +364,7 @@ void run_api(ExtraChainNode* node) {
                 subscribeActive = true;
             }
 
+            eLog("[api] [GET] [subscription_state] [actor_id: {}]", actorId);
             auto row = node->dfs()->get_vector_row(raccoon_id, sub_file_id, actor_id->to_string());
 
             if (subscribed != row.has_value()) {
