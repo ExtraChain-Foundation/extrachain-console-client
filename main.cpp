@@ -309,8 +309,8 @@ int main(int argc, char* argv[]) {
     QString argEmail    = parser.value(emailOption);
     QString argPassword = parser.value(passOption);
     QString email =
-        argEmail.isEmpty() && !AutologinHash::isAvailable() ? ConsoleManager::getSomething("e-mail") : argEmail;
-    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
+        argEmail.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("e-mail") : argEmail;
+    QString password = argPassword.isEmpty() && !AutologinHash::is_available()
                            ? ConsoleManager::getSomething("password")
                            : argPassword;
     if (argEmail.isEmpty() || argPassword.isEmpty())
@@ -328,7 +328,7 @@ int main(int argc, char* argv[]) {
         // node->blockchain()->getBlockIndex().setBlockCompress(false);
     }
 
-    QObject::connect(node, &ExtraChainNode::NodeInitialised, [&]() {
+    QObject::connect(node, &ExtraChainNode::nodeInitialised, [&]() {
         eLog("[Console] Activated");
         console.setExtraChainNode(node);
         console.dfsStart();
@@ -379,10 +379,10 @@ int main(int argc, char* argv[]) {
             file.close();
         }
 
-        if (node->accountController()->count() == 0) {
+        if (node->account_controller()->count() == 0) {
             std::string   loginHash;
             AutologinHash autologinHash;
-            if (AutologinHash::isAvailable() && autologinHash.load()) {
+            if (AutologinHash::is_available() && autologinHash.load()) {
                 loginHash = autologinHash.hash();
             } else {
                 loginHash = Utils::calculate_hash((email + password).toStdString());
@@ -391,7 +391,7 @@ int main(int argc, char* argv[]) {
 
             auto result = node->login(loginHash);
             if (!result) {
-                if (AccountController::profilesList().size() != 0)
+                if (AccountController::profiles_list().size() != 0)
                     eInfo("Error: Incorrect login or password");
                 else
                     eInfo("Error: No profiles files");
@@ -510,9 +510,10 @@ int main(int argc, char* argv[]) {
                 eFatal("Can't open console-data/0 mega block");
             }
 
-            auto rows          = db.select("SELECT * FROM GenesisDataRow");
-            auto network_actor = node->accountController()->currentProfile().get_actor(node->network_id()).value();
-            auto section       = node->dag()->read_section(SectionId(0));
+            auto rows = db.select("SELECT * FROM GenesisDataRow");
+            auto network_actor =
+                node->account_controller()->current_profile().get_actor(node->network_id()).value();
+            auto section = node->dag()->read_section(SectionId(0));
 
             if (!section.has_value()) {
                 eFatal("No zero section");
@@ -549,6 +550,9 @@ int main(int argc, char* argv[]) {
             node->dag()->clear_controls();
             node->dag()->generate_hash();
         }
+
+        // node->dag()->sum_all_rewards();
+        // node->dag()->cache_log();
 
         return;
     });
