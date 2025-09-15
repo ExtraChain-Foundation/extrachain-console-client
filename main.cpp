@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption debugLogsOption("debug-logs", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
-    QCommandLineOption emailOption({ "e", "login" }, "Set login", "login");
+    QCommandLineOption loginOption({ "e", "login" }, "Set login", "login");
     QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
-                        emailOption,
+                        loginOption,
                         passOption,
                         inputOption,
                         core,
@@ -306,14 +306,14 @@ int main(int argc, char* argv[]) {
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argEmail    = parser.value(emailOption);
+    QString argLogin    = parser.value(loginOption);
     QString argPassword = parser.value(passOption);
-    QString email =
-        argEmail.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("e-mail") : argEmail;
+    QString login =
+        argLogin.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("login") : argLogin;
     QString password = argPassword.isEmpty() && !AutologinHash::is_available()
                            ? ConsoleManager::getSomething("password")
                            : argPassword;
-    if (argEmail.isEmpty() || argPassword.isEmpty())
+    if (argLogin.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
         eLog("[Console] Input off");
@@ -345,7 +345,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (isNewNetwork) {
-            bool res = node->create_new_network(email.toStdString(), password.toStdString());
+            bool res = node->create_new_network(login.toStdString(), password.toStdString());
             if (!res) {
                 eInfo("Can't create new network");
                 std::exit(0);
@@ -375,7 +375,7 @@ int main(int argc, char* argv[]) {
                 eInfo("Incorrect import");
                 std::exit(0);
             }
-            node->import_profile(data, email.toStdString(), password.toStdString());
+            node->import_profile(data, login.toStdString(), password.toStdString());
             file.close();
         }
 
@@ -385,7 +385,7 @@ int main(int argc, char* argv[]) {
             if (AutologinHash::is_available() && autologinHash.load()) {
                 loginHash = autologinHash.hash();
             } else {
-                loginHash = Utils::calculate_hash((email + password).toStdString());
+                loginHash = Utils::calculate_hash((login + password).toStdString());
                 password.clear();
             }
 
