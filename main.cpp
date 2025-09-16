@@ -200,8 +200,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption debugLogsOption("debug-logs", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
-    QCommandLineOption loginOption({ "e", "login" }, "Set login", "login");
-    QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
+    QCommandLineOption loginOption("login", "Set login", "login");
+    QCommandLineOption passOption("password", "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
     QCommandLineOption dag_genesis("dag-genesis", "First dag creation");

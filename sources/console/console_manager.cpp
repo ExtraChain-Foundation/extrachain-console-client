@@ -185,7 +185,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
-            node->network()->connectToNode(ip, networkProtocol);
+            node->network()->connect_to_node(ip, networkProtocol);
         } else {
             eInfo("Invalid connect input");
         }
