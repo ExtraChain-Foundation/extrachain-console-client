@@ -123,8 +123,8 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(6) == "transaction") {
         eLog("[Console] 'transaction' command");
-        auto    mainActorId = node->accountController()->system_actor().id();
-        ActorId firstId     = node->actorIndex()->network_id();
+        auto    mainActorId = node->account_controller()->system_actor().id();
+        ActorId firstId     = node->actor_index()->network_id();
 
         QStringList sendtx = command.split(" ");
         if (sendtx.length() == 3) {
@@ -144,7 +144,7 @@ void ConsoleManager::commandReceiver(QString command) {
             tx.set_receiver(receiver);
             tx.set_amount(amount);
             // createTransaction
-            node->send_transaction(tx, node->accountController()->system_actor());
+            node->send_transaction(tx, node->account_controller()->system_actor());
 
             //            if (mainActorId != firstId)
             //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
@@ -185,7 +185,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
             qInfo().noquote() << "Connect to" << ip << protocol;
-            node->network()->connectToNode(ip, networkProtocol);
+            node->network()->connect_to_node(ip, networkProtocol);
         } else {
             eInfo("Invalid connect input");
         }
@@ -195,17 +195,17 @@ void ConsoleManager::commandReceiver(QString command) {
         auto list = command.split(" ");
         if (list.length() > 1) {
             if (list[1] == "new") {
-                auto actor = node->accountController()->createWallet();
+                auto actor = node->account_controller()->create_wallet();
                 eInfo("Wallet created: {}", actor.id());
             }
 
             if (list[1] == "list") {
                 eInfo("Wallets:");
-                auto actors = node->accountController()->accounts();
-                auto mainId = node->accountController()->system_actor().id();
+                auto actors = node->account_controller()->accounts();
+                auto mainId = node->account_controller()->system_actor().id();
                 eInfo("User {}", mainId);
                 for (const auto &actor : actors) {
-                    if (actor.id() != node->accountController()->system_actor().id()) {
+                    if (actor.id() != node->account_controller()->system_actor().id()) {
                         eInfo("Wallet {}", actor.id());
                     }
                 }
@@ -234,7 +234,7 @@ void ConsoleManager::commandReceiver(QString command) {
         std::filesystem::path filepath(file);
         eInfo("Adding file to DFS: {}", command.mid(8));
 
-        auto actor_id = node->accountController()->system_actor().id();
+        auto actor_id = node->account_controller()->system_actor().id();
         auto result   = node->dfs()->store_file(actor_id,
                                               actor_id,
                                               file,
@@ -276,7 +276,7 @@ void ConsoleManager::commandReceiver(QString command) {
         }
         auto    data = QString::fromStdString(exported.value());
         QString fileName =
-            QString("%1.extrachain").arg(node->accountController()->system_actor().id().toQString());
+            QString("%1.extrachain").arg(node->account_controller()->system_actor().id().toQString());
         QFile file(fileName);
         file.open(QFile::WriteOnly);
         if (file.write(data.toUtf8()) > 1)

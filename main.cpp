@@ -200,8 +200,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption debugLogsOption("debug-logs", "Enable debug logs");
     QCommandLineOption clearDataOption("clear-data", "Wipe all data");
     QCommandLineOption dirOption("current-dir", "Set current directory.", "current-dir");
-    QCommandLineOption emailOption({ "e", "login" }, "Set login", "login");
-    QCommandLineOption passOption({ "s", "password" }, "Set password", "password");
+    QCommandLineOption loginOption("login", "Set login", "login");
+    QCommandLineOption passOption("password", "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
     QCommandLineOption dag_genesis("dag-genesis", "First dag creation");
@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
-                        emailOption,
+                        loginOption,
                         passOption,
                         inputOption,
                         core,
@@ -306,14 +306,14 @@ int main(int argc, char* argv[]) {
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argEmail    = parser.value(emailOption);
+    QString argLogin    = parser.value(loginOption);
     QString argPassword = parser.value(passOption);
-    QString email =
-        argEmail.isEmpty() && !AutologinHash::isAvailable() ? ConsoleManager::getSomething("e-mail") : argEmail;
-    QString password = argPassword.isEmpty() && !AutologinHash::isAvailable()
+    QString login =
+        argLogin.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("login") : argLogin;
+    QString password = argPassword.isEmpty() && !AutologinHash::is_available()
                            ? ConsoleManager::getSomething("password")
                            : argPassword;
-    if (argEmail.isEmpty() || argPassword.isEmpty())
+    if (argLogin.isEmpty() || argPassword.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
         eLog("[Console] Input off");
@@ -328,7 +328,7 @@ int main(int argc, char* argv[]) {
         // node->blockchain()->getBlockIndex().setBlockCompress(false);
     }
 
-    QObject::connect(node, &ExtraChainNode::NodeInitialised, [&]() {
+    QObject::connect(node, &ExtraChainNode::nodeInitialised, [&]() {
         eLog("[Console] Activated");
         console.setExtraChainNode(node);
         console.dfsStart();
@@ -345,7 +345,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (isNewNetwork) {
-            bool res = node->create_new_network(email.toStdString(), password.toStdString());
+            bool res = node->create_new_network(login.toStdString(), password.toStdString());
             if (!res) {
                 eInfo("Can't create new network");
                 std::exit(0);
@@ -375,23 +375,23 @@ int main(int argc, char* argv[]) {
                 eInfo("Incorrect import");
                 std::exit(0);
             }
-            node->import_profile(data, email.toStdString(), password.toStdString());
+            node->import_profile(data, login.toStdString(), password.toStdString());
             file.close();
         }
 
-        if (node->accountController()->count() == 0) {
+        if (node->account_controller()->count() == 0) {
             std::string   loginHash;
             AutologinHash autologinHash;
-            if (AutologinHash::isAvailable() && autologinHash.load()) {
+            if (AutologinHash::is_available() && autologinHash.load()) {
                 loginHash = autologinHash.hash();
             } else {
-                loginHash = Utils::calculate_hash((email + password).toStdString());
+                loginHash = Utils::calculate_hash((login + password).toStdString());
                 password.clear();
             }
 
             auto result = node->login(loginHash);
             if (!result) {
-                if (AccountController::profilesList().size() != 0)
+                if (AccountController::profiles_list().size() != 0)
                     eInfo("Error: Incorrect login or password");
                 else
                     eInfo("Error: No profiles files");
@@ -510,9 +510,10 @@ int main(int argc, char* argv[]) {
                 eFatal("Can't open console-data/0 mega block");
             }
 
-            auto rows          = db.select("SELECT * FROM GenesisDataRow");
-            auto network_actor = node->accountController()->currentProfile().get_actor(node->network_id()).value();
-            auto section       = node->dag()->read_section(SectionId(0));
+            auto rows = db.select("SELECT * FROM GenesisDataRow");
+            auto network_actor =
+                node->account_controller()->current_profile().get_actor(node->network_id()).value();
+            auto section = node->dag()->read_section(SectionId(0));
 
             if (!section.has_value()) {
                 eFatal("No zero section");
@@ -549,6 +550,9 @@ int main(int argc, char* argv[]) {
             node->dag()->clear_controls();
             node->dag()->generate_hash();
         }
+
+        // node->dag()->sum_all_rewards();
+        // node->dag()->cache_log();
 
         return;
     });
