@@ -336,7 +336,7 @@ void ConsoleManager::startInput() {
     // }
 
     connect(&consoleInput, &ConsoleInput::input, this, &ConsoleManager::commandReceiver);
-    ThreadPool::addThread(&consoleInput);
+    ThreadPool::add_thread(&consoleInput);
 #elif defined(Q_OS_UNIX)
     // connect(&notifier, &QSocketNotifier::activated, [this] {
     //     QString line = notifierInput.readLine();
