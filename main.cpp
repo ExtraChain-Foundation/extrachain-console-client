@@ -28,6 +28,7 @@
 
 #include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
+#include "managers/thoth_manager.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
@@ -216,6 +217,7 @@ int main(int argc, char* argv[]) {
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
+    QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -244,7 +246,8 @@ int main(int argc, char* argv[]) {
                         dagMode,
                         dfsMode,
                         regenControls,
-                        renamesOption });
+                        renamesOption,
+                        thothOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -295,7 +298,7 @@ int main(int argc, char* argv[]) {
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
-    eInfo("");
+    fmt::println("");
     eLog("[Console] Debug logs on");
 
     bool           isNewNetwork = parser.isSet(core);
@@ -438,6 +441,16 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create renames vector template");
             } else {
                 eSuccess("Renames vector template created");
+            }
+        }
+
+        bool is_thoth = parser.isSet(thothOption);
+        if (is_thoth || isNewNetwork) {
+            auto res = node->thoth_manager()->create_thoth_template();
+            if (!res) {
+                eInfo("Can't create Thoth vector template");
+            } else {
+                eSuccess("Thoth vector template created");
             }
         }
 
