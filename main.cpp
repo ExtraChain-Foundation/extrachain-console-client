@@ -205,7 +205,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption passOption("password", "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
-    QCommandLineOption dag_genesis("dag-genesis", "First dag creation");
+    QCommandLineOption dagGenesisOption("dag-genesis", "First dag creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
@@ -230,7 +230,7 @@ int main(int argc, char* argv[]) {
                         passOption,
                         inputOption,
                         core,
-                        dag_genesis,
+                        dagGenesisOption,
                         clearDataOption,
                         importOption,
                         netdebOption,
@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
     parser.process(app);
 
     // TODO: allow absolute directory
-    QString dirName = Utils::fixFileName(parser.value(dirOption), "");
+    QString dirName = Utils::fix_file_name(parser.value(dirOption), "");
     Utils::dataDir(dirName.isEmpty() ? "console-data" : dirName);
     QDir().mkdir(Utils::dataDir());
     QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
@@ -292,16 +292,16 @@ int main(int argc, char* argv[]) {
         eInfo(" │     Console: {} | Core: {}     │", GIT_COMMIT, GIT_COMMIT_CORE);
     eInfo(" └───────────────────────────────────────────┘");
     LogsManager::etHandler();
-    qInfo().noquote().nospace() << "[Build Info] " << Utils::detectCompiler() << ", Qt " << QT_VERSION_STR
+    qInfo().noquote().nospace() << "[Build Info] " << Utils::detect_compiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DbConnector::sqlite_version() << ", Sodium "
-                                << Utils::sodiumVersion().c_str() << ", Boost " << Utils::boostVersion();
+                                << Utils::sodium_version().c_str() << ", Boost " << Utils::boost_version();
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;
     fmt::println("");
     eLog("[Console] Debug logs on");
 
-    bool           isNewNetwork = parser.isSet(core);
+    bool           is_new_network = parser.isSet(core);
     ConsoleManager console;
     if (!dirName.isEmpty())
         eLog("Custom data directory: {}", dirName);
@@ -309,23 +309,23 @@ int main(int argc, char* argv[]) {
     if (LogsManager::debugLogs)
         LogsManager::print("");
 
-    QString argLogin    = parser.value(loginOption);
-    QString argPassword = parser.value(passOption);
+    QString arg_login    = parser.value(loginOption);
+    QString arg_password = parser.value(passOption);
     QString login =
-        argLogin.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("login") : argLogin;
-    QString password = argPassword.isEmpty() && !AutologinHash::is_available()
+        arg_login.isEmpty() && !AutologinHash::is_available() ? ConsoleManager::getSomething("login") : arg_login;
+    QString password = arg_password.isEmpty() && !AutologinHash::is_available()
                            ? ConsoleManager::getSomething("password")
-                           : argPassword;
-    if (argLogin.isEmpty() || argPassword.isEmpty())
+                           : arg_password;
+    if (arg_login.isEmpty() || arg_password.isEmpty())
         LogsManager::print("");
     if (parser.isSet(inputOption))
         eLog("[Console] Input off");
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* nodeWrapper = new ExtraChainNodeWrapper(&app);
-    auto                   node        = nodeWrapper->node;
-    nodeWrapper->Init(true);
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app);
+    auto                   node         = node_wrapper->node;
+    node_wrapper->init(true);
 
     if (parser.isSet(blockDisableCompress)) {
         // node->blockchain()->getBlockIndex().setBlockCompress(false);
@@ -340,14 +340,14 @@ int main(int argc, char* argv[]) {
 
         QString dfsLimit = parser.value(dfsLimitOption);
         if (!dfsLimit.isEmpty()) {
-            bool    isOk  = false;
-            quint64 limit = dfsLimit.toULongLong(&isOk);
-            if (isOk) {
+            bool    is_ok = false;
+            quint64 limit = dfsLimit.toULongLong(&is_ok);
+            if (is_ok) {
                 // node->dfs()->setBytesLimit(limit);
             }
         }
 
-        if (isNewNetwork) {
+        if (is_new_network) {
             bool res = node->create_new_network(login.toStdString(), password.toStdString());
             if (!res) {
                 eInfo("Can't create new network");
@@ -355,18 +355,18 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        auto dagModeStr = parser.value(dagMode);
-        if (dagModeStr.toLower() == "light") {
-            nodeWrapper->node->dag()->set_mode(DagMode::Light);
+        auto dag_mode_str = parser.value(dagMode);
+        if (dag_mode_str.toLower() == "light") {
+            node_wrapper->node->dag()->set_mode(DagMode::Light);
         } else {
-            nodeWrapper->node->dag()->set_mode(DagMode::Full);
+            node_wrapper->node->dag()->set_mode(DagMode::Full);
         }
 
-        auto dfsModeStr = parser.value(dfsMode);
-        if (dfsModeStr.toLower() == "light") {
-            nodeWrapper->node->dfs()->set_mode(DfsMode::Light);
+        auto dfs_mode_str = parser.value(dfsMode);
+        if (dfs_mode_str.toLower() == "light") {
+            node_wrapper->node->dfs()->set_mode(DfsMode::Light);
         } else {
-            nodeWrapper->node->dfs()->set_mode(DfsMode::Full);
+            node_wrapper->node->dfs()->set_mode(DfsMode::Full);
         }
 
         QString importFile = parser.value(importOption);
@@ -402,13 +402,13 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        if (parser.isSet(dag_genesis)) {
+        if (parser.isSet(dagGenesisOption)) {
             node->create_new_dag();
         }
 
         //
         bool is_token = parser.isSet(tokenOption);
-        if (is_token || isNewNetwork) {
+        if (is_token || is_new_network) {
             bool res1 = node->create_token_template();
             if (res1) {
                 eSuccess("Tokens cache template created");
@@ -425,7 +425,7 @@ int main(int argc, char* argv[]) {
         }
 
         bool is_username = parser.isSet(usernamesOption);
-        if (is_username || isNewNetwork) {
+        if (is_username || is_new_network) {
             auto res = node->create_usernames_vector();
             if (!res) {
                 eInfo("Can't create usernames vector");
@@ -435,7 +435,7 @@ int main(int argc, char* argv[]) {
         }
 
         bool is_renames = parser.isSet(renamesOption);
-        if (is_renames || isNewNetwork) {
+        if (is_renames || is_new_network) {
             auto res = node->create_renames_template();
             if (!res) {
                 eInfo("Can't create renames vector template");
@@ -445,7 +445,7 @@ int main(int argc, char* argv[]) {
         }
 
         bool is_thoth = parser.isSet(thothOption);
-        if (is_thoth || isNewNetwork) {
+        if (is_thoth || is_new_network) {
             auto res = node->thoth_manager()->create_thoth_template();
             if (!res) {
                 eInfo("Can't create Thoth vector template");
@@ -454,8 +454,18 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        bool is_thoth_vector = parser.isSet(thothOption);
+        if (is_thoth_vector || is_new_network) {
+            auto res = node->thoth_manager()->create_thoth_vector();
+            if (!res) {
+                eInfo("Can't create Thoth vector template");
+            } else {
+                eSuccess("Thoth vector created");
+            }
+        }
+
         bool subscription_create = parser.isSet(subscriptionOption);
-        if (subscription_create || isNewNetwork) {
+        if (subscription_create || is_new_network) {
             auto res = node->create_subscription_template();
 
             // temp
@@ -469,7 +479,7 @@ int main(int argc, char* argv[]) {
         }
 
         bool chat_create = parser.isSet(chatOption);
-        if (chat_create || isNewNetwork) {
+        if (chat_create || is_new_network) {
             auto res = node->create_chat_templates();
 
             if (!res) {
@@ -563,6 +573,8 @@ int main(int argc, char* argv[]) {
             node->dag()->clear_controls();
             node->dag()->generate_hash();
         }
+
+        node->thoth_manager()->start();
 
         // node->dag()->sum_all_rewards();
         // node->dag()->cache_log();
