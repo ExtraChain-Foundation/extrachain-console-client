@@ -83,7 +83,7 @@ void run_api(ExtraChainNode* node) {
         }
         TokenId tokenId("468faf2f1be6504a9a26f7f027f7e43380b0d77d");
 
-        if (!node->actorIndex()->exists(actor_id.value())) {
+        if (!node->actor_index()->exists(actor_id.value())) {
             return crow::response(404, R"({"error": "actor not found"})");
         }
 
@@ -349,7 +349,7 @@ void run_api(ExtraChainNode* node) {
             auto raccoon_id = ActorId("46710a2d823c23db9fc2ac01e0f84212a8128373");
 
             auto search_result =
-                Dfs::Tables::ActorDirFile::search_file_by_folder_and_name(raccoon_id,
+                Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(node->dfs()->get_db_instance(), raccoon_id,
                                                                           Dfs::Basic::TEMPLATE_VECTOR,
                                                                           "RaccoonSubscription");
             if (!search_result.has_value()) {
@@ -365,7 +365,7 @@ void run_api(ExtraChainNode* node) {
             }
 
             eLog("[api] [GET] [subscription_state] [actor_id: {}]", actorId);
-            auto row = node->dfs()->get_vector_row(raccoon_id, sub_file_id, actor_id->to_string());
+            auto row = node->dfs()->read_vector_row(raccoon_id, sub_file_id, actor_id->to_string());
 
             if (subscribed != row.has_value()) {
                 subscribed = row.has_value();
@@ -377,6 +377,161 @@ void run_api(ExtraChainNode* node) {
             response["subscribed"] = subscribed;
 
             return crow::response(200, response);
+        });
+
+    CROW_ROUTE(app, "/get_actor")
+        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
+            auto keys = req.url_params.keys();
+
+            auto id = req.url_params.get("id");
+            auto token_param    = std::string(req.url_params.get("token"));
+            if (!id) {
+                return crow::response(400, R"({"error": "id required"})");
+            }
+            if (token_param.empty()) {
+                return crow::response(400, R"({"error": "token is empty."})");
+            }
+            if (token_param != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+
+            auto res = node->actor_index()->read_actor(ActorId(id));
+            if (res.has_value())
+            {
+                crow::json::wvalue response;
+                response["public_key"]     = Utils::to_base64(res.value().key().public_key());
+
+                return crow::response(200, response);
+            }
+
+            return crow::response(400, R"({"error": "No actor"})");
+        });
+
+    CROW_ROUTE(app, "/verify_actor")
+        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
+            auto keys = req.url_params.keys();
+
+            auto id = req.url_params.get("id");
+            auto sig_str = req.url_params.get("signature");
+            auto token_param    = std::string(req.url_params.get("token"));
+            if (!id) {
+                return crow::response(400, R"({"error": "id required"})");
+            }
+            if (!sig_str) {
+                return crow::response(400, R"({"error": "signature required"})");
+            }
+            if (token_param.empty()) {
+                return crow::response(400, R"({"error": "token is empty."})");
+            }
+            if (token_param != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+
+            auto actor_data =node->actor_index()->read_actor(ActorId(id));
+            if (actor_data.has_value())
+            {
+                auto decoded_sig =  Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
+                if (!decoded_sig)
+                    return crow::response(400, R"({"error": "Base64 decoding failed."})");
+
+                const auto& decoded = decoded_sig.value();
+                if (decoded.size() != crypto_sign_BYTES)
+                    return crow::response(400, R"({"error": "Invalid signature length."})");
+
+                Signature signature;
+                std::copy(decoded.begin(), decoded.end(), signature.begin());
+
+                std::string data;
+                auto res = actor_data->key().verify(data, signature);
+
+                if (res.has_value())
+                {
+                    crow::json::wvalue response;
+                    response["result"]     = res.value();
+
+                    return crow::response(200, response);
+                }
+            }
+
+            return crow::response(400, R"({"error": "No data"})");
+        });
+
+    CROW_ROUTE(app, "/get_devices")
+        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
+            auto keys = req.url_params.keys();
+
+            auto token_param    = std::string(req.url_params.get("token"));
+            if (token_param.empty()) {
+                return crow::response(400, R"({"error": "token is empty."})");
+            }
+            if (token_param != token_session) {
+                return crow::response(400, R"({"error": "token is not valid."})");
+            }
+
+
+            if (true)
+            {
+                std::string jsonTemp = R"([
+                    {
+                        "gpu_model": "NVIDIA GeForce RTX 4090",
+                        "gpu_count": 1,
+                        "cpu_model": "AMD Ryzen 9 7950X",
+                        "cpu_cores": 16,
+                        "ram": 32768,
+                        "vram": 24576,
+                        "ssd": true
+                    },
+                    {
+                        "gpu_model": "NVIDIA A100",
+                        "gpu_count": 4,
+                        "cpu_model": "Intel Xeon Platinum 8380",
+                        "cpu_cores": 40,
+                        "ram": 262144,
+                        "vram": 40960,
+                        "ssd": true
+                    },
+                    {
+                        "gpu_model": "AMD Radeon RX 7900 XTX",
+                        "gpu_count": 2,
+                        "cpu_model": "AMD Ryzen Threadripper PRO 5995WX",
+                        "cpu_cores": 64,
+                        "ram": 131072,
+                        "vram": 24576,
+                        "ssd": true
+                    },
+                    {
+                        "gpu_model": "NVIDIA RTX 6000 Ada",
+                        "gpu_count": 1,
+                        "cpu_model": "Intel Core i9-14900K",
+                        "cpu_cores": 24,
+                        "ram": 65536,
+                        "vram": 49152,
+                        "ssd": true
+                    },
+                    {
+                        "gpu_model": "NVIDIA GeForce RTX 4070 Ti",
+                        "gpu_count": 1,
+                        "cpu_model": "Intel Core i7-13700K",
+                        "cpu_cores": 16,
+                        "ram": 32768,
+                        "vram": 12288,
+                        "ssd": true
+                    }
+                ])";
+
+                auto parsed_json = crow::json::load(jsonTemp);
+                if (!parsed_json) {
+                    return crow::response(400, "Invalid JSON format");
+                }
+
+                crow::json::wvalue response;
+                response["result"] = parsed_json;
+                return crow::response(200, response);
+            }
+
+            return crow::response(400, R"({"error": "No data"})");
         });
 
     std::uint16_t port = 8080;
