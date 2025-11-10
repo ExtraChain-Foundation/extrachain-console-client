@@ -244,10 +244,10 @@ Parameters
     •    token (string) – Session token for authorization.
 
 Example request
-/get_actor?id=c3659c28c0974df7c53cf752dfe6366e424f1b3d&token=26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c
+/verify_actor?id=f6656942732dc8f9e4d3f385ff99b895aac70851&signature=LvfHAPhlNPPwX0CYqxJF57feqOSLptawjgQZkC-XYOIncQAIC5zRMK4PKOCoLF__pvW1UmNGiLVBvn8oJFmZCw&token=26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c
 Example response
 {
-    "public_key": "JHimQL6cb-V4fVld4gJuGN0Kk0S5yGnRwlXuB_nVruQ"
+    "result": true
 }
 
 ## /get_devices

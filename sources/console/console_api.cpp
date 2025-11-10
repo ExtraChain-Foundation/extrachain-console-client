@@ -430,32 +430,33 @@ void run_api(ExtraChainNode* node) {
 
 
             auto actor_data =node->actor_index()->read_actor(ActorId(id));
-            if (actor_data.has_value())
-            {
-                auto decoded_sig =  Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
-                if (!decoded_sig)
-                    return crow::response(400, R"({"error": "Base64 decoding failed."})");
-
-                const auto& decoded = decoded_sig.value();
-                if (decoded.size() != crypto_sign_BYTES)
-                    return crow::response(400, R"({"error": "Invalid signature length."})");
-
-                Signature signature;
-                std::copy(decoded.begin(), decoded.end(), signature.begin());
-
-                std::string data;
-                auto res = actor_data->key().verify(data, signature);
-
-                if (res.has_value())
-                {
-                    crow::json::wvalue response;
-                    response["result"]     = res.value();
-
-                    return crow::response(200, response);
-                }
+            if (!actor_data.has_value()) {
+                return crow::response(400, R"({"error": "No data"})");
             }
 
-            return crow::response(400, R"({"error": "No data"})");
+            auto decoded_sig =  Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
+            if (!decoded_sig) {
+                return crow::response(400, R"({"error": "Base64 decoding failed."})");
+            }
+
+            const auto& decoded = decoded_sig.value();
+            if (decoded.size() != crypto_sign_BYTES) {
+                return crow::response(400, R"({"error": "Invalid signature length."})");
+            }
+
+            Signature signature;
+            std::copy(decoded.begin(), decoded.end(), signature.begin());
+
+            auto res = actor_data->key().verify(id, signature);
+
+            if (!res.has_value()) {
+                return crow::response(400, R"({"error": "No data"})");
+            }
+
+            crow::json::wvalue response;
+            response["result"]     = res.value();
+
+            return crow::response(200, response);
         });
 
     CROW_ROUTE(app, "/get_devices")
@@ -535,6 +536,6 @@ void run_api(ExtraChainNode* node) {
         });
 
     std::uint16_t port = 8080;
-    app.port(port).concurrency(2).run();
+    app.bindaddr("127.0.0.1").port(port).concurrency(2).run();
     eLog("Started api on port {}", port);
 }
