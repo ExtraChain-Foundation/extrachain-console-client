@@ -76,7 +76,7 @@ void PushManager::saveNotificationToken(QByteArray os, ActorId actorId, ActorId 
     auto &key = main.key();
 
     const std::string &osActorId = actorId.to_string();
-    // auto               apk         = node->actorIndex()->getActor(actorId).key().public_key();
+    // auto               apk         = node->actorIndex()->getActor(actorId).public_key();
     // std::string        osDecrypted = ByteArray(key.decrypt(ByteArray(os).toBytes(), apk)).toString();
     // std::string        osToken = ByteArray(key.decrypt(ByteArray(token.toQString()).toBytes(), apk)).toString();
 

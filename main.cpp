@@ -28,6 +28,7 @@
 
 #include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
+#include "managers/janus_manager.h"
 #include "managers/thoth_manager.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
@@ -211,6 +212,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     QCommandLineOption megaOption("mega", "Create mega loot");
+    QCommandLineOption dataTemplateOption("create-data-private-template", "Create data private template");
     QCommandLineOption tokenOption("create-token-cache", "Create token cache for network id");
     QCommandLineOption usernamesOption("create-usernames", "Create usernames vector from network id");
     QCommandLineOption subscriptionOption("create-subscription-template",
@@ -218,6 +220,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
+    QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
+    QCommandLineOption janusOption("create-janus-template", "Create FileId template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -237,6 +241,7 @@ int main(int argc, char* argv[]) {
                         dfsLimitOption,
                         blockDisableCompress,
                         // megaOption,
+                        dataTemplateOption,
                         tokenOption,
                         usernamesOption,
                         subscriptionOption,
@@ -247,7 +252,9 @@ int main(int argc, char* argv[]) {
                         dfsMode,
                         regenControls,
                         renamesOption,
-                        thothOption });
+                        thothOption,
+                        fileIdOption,
+                        janusOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -407,6 +414,16 @@ int main(int argc, char* argv[]) {
         }
 
         //
+        bool is_data_template = parser.isSet(dataTemplateOption);
+        if (is_data_template || is_new_network) {
+            // auto res = node->create_data_template();
+            // if (!res) {
+            //     eInfo("Can't create Data vector template");
+            // } else {
+            //     eSuccess("Data vector template created");
+            // }
+        }
+
         bool is_token = parser.isSet(tokenOption);
         if (is_token || is_new_network) {
             bool res1 = node->create_token_template();
@@ -486,6 +503,40 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create chat templates");
             } else {
                 eSuccess("Chat templates created");
+            }
+        }
+
+        bool file_id_create = parser.isSet(fileIdOption);
+        if (file_id_create || is_new_network) {
+            auto res = node->create_file_id_template(FileIdState::None);
+            if (!res) {
+                eInfo("Can't create file id templates");
+            } else {
+                eSuccess("File id template created");
+            }
+
+            auto res2 = node->create_file_id_template(FileIdState::With);
+            if (!res2) {
+                eInfo("Can't create file id state templates");
+            } else {
+                eSuccess("File id state template created");
+            }
+
+            auto res3 = node->janus_manager()->create_argentum_vector();
+            if (!res3) {
+                eInfo("Can't create arg templates");
+            } else {
+                eSuccess("File arg created");
+            }
+        }
+
+        bool janus_template_create = parser.isSet(janusOption);
+        if (janus_template_create || is_new_network) {
+            auto res = node->janus_manager()->create_janus_template();
+            if (!res) {
+                eInfo("Can't janus templates");
+            } else {
+                eSuccess("Janus template created");
             }
         }
 
