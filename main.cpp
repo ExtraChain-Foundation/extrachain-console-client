@@ -28,7 +28,6 @@
 
 #include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
-#include "managers/janus_manager.h"
 #include "managers/thoth_manager.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
@@ -221,7 +220,6 @@ int main(int argc, char* argv[]) {
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
     QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
-    QCommandLineOption janusOption("create-janus-template", "Create FileId template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -253,8 +251,7 @@ int main(int argc, char* argv[]) {
                         regenControls,
                         renamesOption,
                         thothOption,
-                        fileIdOption,
-                        janusOption });
+                        fileIdOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -520,23 +517,6 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create file id state templates");
             } else {
                 eSuccess("File id state template created");
-            }
-
-            auto res3 = node->janus_manager()->create_argentum_vector();
-            if (!res3) {
-                eInfo("Can't create arg templates");
-            } else {
-                eSuccess("File arg created");
-            }
-        }
-
-        bool janus_template_create = parser.isSet(janusOption);
-        if (janus_template_create || is_new_network) {
-            auto res = node->janus_manager()->create_janus_template();
-            if (!res) {
-                eInfo("Can't janus templates");
-            } else {
-                eSuccess("Janus template created");
             }
         }
 
