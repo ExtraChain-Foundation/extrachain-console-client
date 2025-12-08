@@ -327,7 +327,7 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app);
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17594);
     auto                   node         = node_wrapper->node;
     node_wrapper->init(true);
 
