@@ -505,14 +505,14 @@ int main(int argc, char* argv[]) {
 
         bool file_id_create = parser.isSet(fileIdOption);
         if (file_id_create || is_new_network) {
-            auto res = node->create_file_id_template(FileIdState::None);
+            auto res = node->create_file_id_template(Dfs::FileIdState::Without);
             if (!res) {
                 eInfo("Can't create file id templates");
             } else {
                 eSuccess("File id template created");
             }
 
-            auto res2 = node->create_file_id_template(FileIdState::With);
+            auto res2 = node->create_file_id_template(Dfs::FileIdState::With);
             if (!res2) {
                 eInfo("Can't create file id state templates");
             } else {
