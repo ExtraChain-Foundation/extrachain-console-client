@@ -238,7 +238,6 @@ int main(int argc, char* argv[]) {
                         dfsLimitOption,
                         blockDisableCompress,
                         // megaOption,
-                        dataTemplateOption,
                         tokenOption,
                         usernamesOption,
                         subscriptionOption,
