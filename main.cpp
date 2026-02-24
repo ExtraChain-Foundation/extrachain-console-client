@@ -211,7 +211,6 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsLimitOption({ "l", "limit" }, "Set limit", "dfs-limit");
     QCommandLineOption blockDisableCompress("disable-compress", "Blockchain compress disable");
     QCommandLineOption megaOption("mega", "Create mega loot");
-    QCommandLineOption dataTemplateOption("create-data-private-template", "Create data private template");
     QCommandLineOption tokenOption("create-token-cache", "Create token cache for network id");
     QCommandLineOption usernamesOption("create-usernames", "Create usernames vector from network id");
     QCommandLineOption subscriptionOption("create-subscription-template",
@@ -327,7 +326,7 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17594);
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17593);
     auto                   node         = node_wrapper->node;
     node_wrapper->init(true);
 
@@ -408,17 +407,6 @@ int main(int argc, char* argv[]) {
 
         if (parser.isSet(dagGenesisOption)) {
             node->create_new_dag();
-        }
-
-        //
-        bool is_data_template = parser.isSet(dataTemplateOption);
-        if (is_data_template || is_new_network) {
-            // auto res = node->create_data_template();
-            // if (!res) {
-            //     eInfo("Can't create Data vector template");
-            // } else {
-            //     eSuccess("Data vector template created");
-            // }
         }
 
         bool is_token = parser.isSet(tokenOption);
