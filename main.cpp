@@ -218,6 +218,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
+    QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -247,7 +248,8 @@ int main(int argc, char* argv[]) {
                         dfsMode,
                         regenControls,
                         renamesOption,
-                        thothOption });
+                        thothOption,
+                        fileIdOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -323,7 +325,7 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app);
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17593);
     auto                   node         = node_wrapper->node;
     node_wrapper->init(true);
 
@@ -406,7 +408,6 @@ int main(int argc, char* argv[]) {
             node->create_new_dag();
         }
 
-        //
         bool is_token = parser.isSet(tokenOption);
         if (is_token || is_new_network) {
             bool res1 = node->create_token_template();
@@ -486,6 +487,23 @@ int main(int argc, char* argv[]) {
                 eInfo("Can't create chat templates");
             } else {
                 eSuccess("Chat templates created");
+            }
+        }
+
+        bool file_id_create = parser.isSet(fileIdOption);
+        if (file_id_create || is_new_network) {
+            auto res = node->create_file_id_template(Dfs::FileIdState::Without);
+            if (!res) {
+                eInfo("Can't create file id templates");
+            } else {
+                eSuccess("File id template created");
+            }
+
+            auto res2 = node->create_file_id_template(Dfs::FileIdState::With);
+            if (!res2) {
+                eInfo("Can't create file id state templates");
+            } else {
+                eSuccess("File id state template created");
             }
         }
 
