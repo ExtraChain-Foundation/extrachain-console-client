@@ -26,7 +26,7 @@
 #include "dfs/dfs_controller.h"
 #include "chain/actor_index.h"
 #include "managers/extrachain_node.h"
-#include "managers/logs_manager.h"
+#include "utils/exc_logs.h"
 #include "network/network_manager.h"
 #include "network/isocket_service.h"
 
@@ -90,12 +90,14 @@ void ConsoleManager::commandReceiver(QString command) {
     }
 
     if (command == "logs on") {
-        LogsManager::on();
+        Logger::instance().set_debug(true);
+        Logger::start_file("extrachain");
         eInfo("Logs enabled");
     }
 
     if (command == "logs off") {
-        LogsManager::off();
+        Logger::instance().set_debug(false);
+        Logger::stop_file();
         eInfo("Logs disabled");
     }
 
