@@ -22,6 +22,7 @@
 #include "crow.h"
 #include <chrono>
 #include <regex>
+#include <QFile>
 
 #include "managers/extrachain_node.h"
 #include "chain/dag.h"
@@ -56,43 +57,49 @@ void run_api(ExtraChainNode* node) {
     std::string     token_session = "26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c";
     eLog("API runned.");
 
-    auto contains = [&](std::vector<std::string> fields, const std::string& value) {
-        return std::find(fields.begin(), fields.end(), value) != fields.end();
+    auto json_error = [](int code, const std::string& message) {
+        crow::json::wvalue err;
+        err["error"] = message;
+        return crow::response(code, err);
     };
 
-    CROW_ROUTE(app, "/balance").methods("POST"_method)([&node, &token_session](const crow::request& req) {
-        auto json = crow::json::load(req.body);
-
-        if (!json || !json.has("actor_id")) {
-            return crow::response(400, R"({"error": "actor_id required"})");
-        }
-
+    auto check_token_post = [&](const crow::json::rvalue& json) -> std::optional<crow::response> {
+        if (!json.has("token")) return json_error(400, "token required");
         std::string token = std::string(json["token"].s());
-        if (!json.has("token") || token.empty()) {
-            return crow::response(400, R"({"error": "missing or empty token."})");
-        }
+        if (token.empty()) return json_error(400, "token is empty");
+        if (token != token_session) return json_error(400, "token is not valid");
+        return std::nullopt;
+    };
 
-        if (token != token_session) {
-            return crow::response(400, R"({"error": "token is not valid."})");
-        }
+    auto check_token_get = [&](const crow::request& req) -> std::optional<crow::response> {
+        auto token_raw = req.url_params.get("token");
+        if (!token_raw) return json_error(400, "token required");
+        std::string token(token_raw);
+        if (token.empty()) return json_error(400, "token is empty");
+        if (token != token_session) return json_error(400, "token is not valid");
+        return std::nullopt;
+    };
+
+    CROW_ROUTE(app, "/balance").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json) return json_error(400, "invalid json");
+        if (auto err = check_token_post(json)) return std::move(*err);
+        if (!json.has("actor_id")) return json_error(400, "actor_id required");
 
         std::string actorIdStr = json["actor_id"].s();
         auto        actor_id   = ActorId::create(actorIdStr);
-        if (!actor_id.has_value()) {
-            return crow::response(400, R"({"error": "invalid actor_id"})");
-        }
+        if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
+
         TokenId tokenId("468faf2f1be6504a9a26f7f027f7e43380b0d77d");
 
-        if (!node->actor_index()->exists(actor_id.value())) {
-            return crow::response(404, R"({"error": "actor not found"})");
-        }
+        if (!node->actor_index()->exists(actor_id.value())) return json_error(404, "actor not found");
+
+        eLog("[api] [POST] [balance] [actor_id: {}]", actorIdStr);
 
         std::map<std::pair<ActorId, TokenId>, BigNumberFloat> balances =
             node->dag()->calculate_actors_balance({ actor_id.value() });
 
-        eLog("[api] [POST] [transaction_by_hash_and_section_id] [actor_id: {}]", actorIdStr);
-
-        BigNumberFloat balance    = BigNumberFloat(0); // default
+        BigNumberFloat balance    = BigNumberFloat(0);
         auto           balanceKey = std::make_pair(actor_id.value(), tokenId);
         auto           it         = balances.find(balanceKey);
         if (it != balances.end()) {
@@ -102,42 +109,24 @@ void run_api(ExtraChainNode* node) {
         crow::json::wvalue response;
         response["actor_id"] = actor_id.value().to_string();
         response["balance"]  = balance.to_string(NumeralBase::Dec);
-
         return crow::response(200, response);
     });
 
-    // section_id and hash
     CROW_ROUTE(app, "/transaction_by_hash_and_section_id")
-        .methods("POST"_method)([&node, &token_session](const crow::request& req) {
+        .methods("POST"_method)([&](const crow::request& req) {
             auto json = crow::json::load(req.body);
-            if (!json || !json.has("hash")) {
-                return crow::response(400, R"({"error": "hash required"})");
-            }
-
-            if (!json.has("section_id")) {
-                return crow::response(400, R"({"error": "section_id required"})");
-            }
-
-            if (!json.has("token")) {
-                return crow::response(400, R"({"error": "token required"})");
-            }
-
-            std::string token = std::string(json["token"].s());
-            if (token.empty()) {
-                return crow::response(400, R"({"error": "token empty."})");
-            }
-
-            if (token != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+            if (!json) return json_error(400, "invalid json");
+            if (auto err = check_token_post(json)) return std::move(*err);
+            if (!json.has("hash")) return json_error(400, "hash required");
+            if (!json.has("section_id")) return json_error(400, "section_id required");
 
             std::string hash          = json["hash"].s();
             int         sectionNumber = json["section_id"].i();
             auto        section       = node->dag()->read_section(SectionId(sectionNumber));
-            auto        transactions  = section->transactions;
-            if (transactions.empty()) {
-                return crow::response(400, fmt::format(R"({{"error": "list transactions is empty"}})"));
-            }
+            if (!section.has_value()) return json_error(400, "section not found");
+
+            auto transactions = section->transactions;
+            if (transactions.empty()) return json_error(400, "list transactions is empty");
 
             eLog("[api] [POST] [transaction_by_hash_and_section_id] [hash: {}]", hash);
 
@@ -145,69 +134,37 @@ void run_api(ExtraChainNode* node) {
                 return t.hash() == hash;
             });
 
-            if (it != transactions.end()) {
-                Transaction        tx = *it;
-                crow::json::wvalue response;
-                response["hash"]     = hash;
-                response["sender"]   = tx.sender().to_string();
-                response["receiver"] = tx.receiver().to_string();
-                response["amount"]   = tx.amount().to_string(NumeralBase::Dec);
-                auto dateTime        = QDateTime::fromMSecsSinceEpoch(tx.timestamp());
-                response["date"]     = dateTime.toString("dd/MM/yyyy").toStdString();
-                response["time"]     = dateTime.toString("hh:mm:ss").toStdString();
-                std::string typeTx;
-                switch (tx.type()) {
-                case TransactionType::Genesis:
-                    typeTx = "genesis";
-                    break;
-                case TransactionType::Balance:
-                    typeTx = "balance";
-                    break;
-                case TransactionType::Burn:
-                    typeTx = "burn";
-                    break;
-                case TransactionType::InitContract:
-                    typeTx = "init_contract";
-                    break;
-                case TransactionType::Conversion:
-                    typeTx = "conversion";
-                    break;
-                case TransactionType::Regular:
-                    typeTx = "regular";
-                    break;
-                case TransactionType::Repeatable:
-                    typeTx = "repeatable";
-                    break;
-                case TransactionType::Reward:
-                    typeTx = "reward";
-                    break;
-                default:
-                    break;
-                }
-                response["type"] = typeTx;
+            if (it == transactions.end()) return json_error(400, "transaction not found");
 
-                return crow::response(200, response);
+            Transaction        tx = *it;
+            crow::json::wvalue response;
+            response["hash"]     = hash;
+            response["sender"]   = tx.sender().to_string();
+            response["receiver"] = tx.receiver().to_string();
+            response["amount"]   = tx.amount().to_string(NumeralBase::Dec);
+            auto dateTime        = QDateTime::fromMSecsSinceEpoch(tx.timestamp());
+            response["date"]     = dateTime.toString("dd/MM/yyyy").toStdString();
+            response["time"]     = dateTime.toString("hh:mm:ss").toStdString();
+            std::string typeTx;
+            switch (tx.type()) {
+            case TransactionType::Genesis:     typeTx = "genesis";       break;
+            case TransactionType::Balance:     typeTx = "balance";       break;
+            case TransactionType::Burn:        typeTx = "burn";          break;
+            case TransactionType::InitContract: typeTx = "init_contract"; break;
+            case TransactionType::Conversion:  typeTx = "conversion";    break;
+            case TransactionType::Regular:     typeTx = "regular";       break;
+            case TransactionType::Repeatable:  typeTx = "repeatable";    break;
+            case TransactionType::Reward:      typeTx = "reward";        break;
+            case TransactionType::Minting:     typeTx = "minting";       break;
+            default:                                                       break;
             }
-
-            return crow::response(400, fmt::format(R"({{"error": "can not found transaction."}})"));
+            response["type"] = typeTx;
+            return crow::response(200, response);
         });
 
     CROW_ROUTE(app, "/count_sections")
-        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
-            auto keys = req.url_params.keys();
-            if (!contains(keys, "token")) {
-                return crow::response(400, R"({"error": "token required"})");
-            }
-
-            auto        token_param = req.url_params.get("token");
-            std::string token       = std::string(token_param);
-            if (token.empty()) {
-                return crow::response(400, R"({"error": "token is empty."})");
-            }
-
-            if (token != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+        .methods("GET"_method)([&](const crow::request& req) {
+            if (auto err = check_token_get(req)) return std::move(*err);
             eLog("[api] [GET] [count_sections]");
             crow::json::wvalue response;
             response["count_sections"] = node->dag()->current_section().to_string(NumeralBase::Dec);
@@ -215,72 +172,39 @@ void run_api(ExtraChainNode* node) {
         });
 
     CROW_ROUTE(app, "/count_transactions_in_section")
-        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
-            auto keys = req.url_params.keys();
-
-            if (!contains(keys, "number_section") || !contains(keys, "token")) {
-                return crow::response(400, R"({"error": "number_section and token required"})");
-            }
+        .methods("GET"_method)([&](const crow::request& req) {
+            if (auto err = check_token_get(req)) return std::move(*err);
 
             auto number_section = req.url_params.get("number_section");
-            auto token_param    = req.url_params.get("token");
-            if (!number_section) {
-                return crow::response(400, R"({"error": "number_section required"})");
-            }
+            if (!number_section) return json_error(400, "number_section required");
 
             int  section_number = std::stoi(number_section);
             auto section        = node->dag()->read_section(BigNumber(section_number));
-
-            if (!section.has_value()) {
-                return crow::response(400, R"({"error": "invalid number section"})");
-            }
-
-            std::string token = std::string(token_param);
-            if (token.empty()) {
-                return crow::response(400, R"({"error": "token is empty."})");
-            }
-
-            if (token != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+            if (!section.has_value()) return json_error(400, "invalid number section");
 
             eLog("[api] [GET] [count_transactions_in_section] [number_section: {}]", number_section);
-            auto countTx = section->transactions.size();
 
             crow::json::wvalue response;
-            response["count_transactions"] = countTx;
+            response["count_transactions"] = section->transactions.size();
             response["section_number"]     = number_section;
-
             return crow::response(200, response);
         });
 
-    CROW_ROUTE(app, "/have_rewards").methods("POST"_method)([&node, &token_session](const crow::request& req) {
+    CROW_ROUTE(app, "/have_rewards").methods("POST"_method)([&](const crow::request& req) {
         auto json = crow::json::load(req.body);
-        if (!json || !json.has("actor_id")) {
-            return crow::response(400, R"({"error": "actor_id required"})");
-        }
-
-        std::string token = std::string(json["token"].s());
-        if (!json.has("token") || token.empty()) {
-            return crow::response(400, R"({"error": "missing or empty token."})");
-        }
-
-        if (token != token_session) {
-            return crow::response(400, R"({"error": "token is not valid."})");
-        }
+        if (!json) return json_error(400, "invalid json");
+        if (auto err = check_token_post(json)) return std::move(*err);
+        if (!json.has("actor_id")) return json_error(400, "actor_id required");
 
         std::string actorId  = json["actor_id"].s();
         std::string period   = json.has("period") ? json["period"].s() : std::string();
         long long   periodMs = parseTimeToMs(period);
 
         auto actor_id = ActorId::create(actorId);
-        if (!actor_id.has_value()) {
-            return crow::response(400, R"({"error": "invalid actor_id"})");
-        }
+        if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
 
-        // Вычисляем время отсечки
-        auto now        = std::chrono::system_clock::now().time_since_epoch();
-        auto cutoffTime = std::chrono::milliseconds(now.count() - periodMs);
+        auto now          = std::chrono::system_clock::now().time_since_epoch();
+        auto cutoffTimeMs = static_cast<std::uint64_t>(now.count() - periodMs);
 
         bool hasRewards  = false;
         int  rewardCount = 0;
@@ -288,29 +212,18 @@ void run_api(ExtraChainNode* node) {
         const std::vector<BigNumber> sections = node->dag()->cache().read_index(actor_id.value());
         for (const auto& section_id : sections) {
             auto section = node->dag()->read_section(section_id);
-            if (!section.has_value()) {
-                continue;
-            }
+            if (!section.has_value()) continue;
 
             for (const auto& tx : section.value().transactions) {
                 if (tx.type() == TransactionType::Reward) {
-                    // Получаем время транзакции (нужно реализовать tx.timestamp() или подобное)
-                    auto txTime = tx.timestamp(); // предполагаем что возвращает std::chrono::milliseconds
-                    auto cutoffTimeMs = static_cast<std::uint64_t>(now.count() - periodMs);
-
-                    if (txTime >= cutoffTimeMs) {
+                    if (tx.timestamp() >= cutoffTimeMs) {
                         hasRewards = true;
                         rewardCount++;
                     } else {
-                        // Если транзакция старше периода, прерываем (если секции отсортированы по времени)
                         break;
                     }
                 }
             }
-
-            // Если нужно выйти за пределы времени на уровне секций
-            // auto sectionTime = section.value().timestamp();
-            // if (sectionTime < cutoffTime) break;
         }
 
         crow::json::wvalue response;
@@ -319,223 +232,142 @@ void run_api(ExtraChainNode* node) {
         response["reward_count"] = rewardCount;
         response["period_ms"]    = periodMs;
         response["period_str"]   = period.empty() ? "1d" : period;
-
         return crow::response(200, response);
     });
 
     CROW_ROUTE(app, "/subscription_state")
-        .methods("POST"_method)([&node, &token_session](const crow::request& req) {
+        .methods("POST"_method)([&](const crow::request& req) {
             auto json = crow::json::load(req.body);
-            if (!json || !json.has("actor_id")) {
-                return crow::response(400, R"({"error": "actor_id required"})");
-            }
+            if (!json) return json_error(400, "invalid json");
+            if (auto err = check_token_post(json)) return std::move(*err);
+            if (!json.has("actor_id")) return json_error(400, "actor_id required");
 
-            std::string actorId = json["actor_id"].s();
-
-            auto actor_id = ActorId::create(actorId);
-            if (!actor_id.has_value()) {
-                return crow::response(400, R"({"error": "invalid actor_id"})");
-            }
-
-            std::string token = std::string(json["token"].s());
-            if (!json.has("token") || token.empty()) {
-                return crow::response(400, R"({"error": "missing or empty token."})");
-            }
-
-            if (token != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+            std::string actorId  = json["actor_id"].s();
+            auto        actor_id = ActorId::create(actorId);
+            if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
 
             auto raccoon_id = ActorId("46710a2d823c23db9fc2ac01e0f84212a8128373");
 
             auto search_result =
-                Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(node->dfs()->get_db_instance(), raccoon_id,
-                                                                          Dfs::Basic::TEMPLATE_VECTOR,
-                                                                          "RaccoonSubscription");
-            if (!search_result.has_value()) {
-                return crow::response(400, R"({"error": "can not find subscription"})");
-            }
+                Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(node->dfs()->get_db_instance(),
+                                                                                  raccoon_id,
+                                                                                  Dfs::Basic::TEMPLATE_VECTOR,
+                                                                                  "RaccoonSubscription");
+            if (!search_result.has_value()) return json_error(400, "can not find subscription");
 
-            std::string sub_file_id     = search_result->file_id;
-            bool        subscribeActive = false;
-            bool        subscribed      = false;
+            bool subscribeActive = search_result->state == Dfs::FileState::Ready;
+            bool subscribed      = false;
 
-            if (search_result->state == Dfs::FileState::Ready) {
-                subscribeActive = true;
-            }
-
-            eLog("[api] [GET] [subscription_state] [actor_id: {}]", actorId);
-            auto row = node->dfs()->read_vector_row(raccoon_id, sub_file_id, actor_id->to_string());
-
-            if (subscribed != row.has_value()) {
-                subscribed = row.has_value();
-            }
+            eLog("[api] [POST] [subscription_state] [actor_id: {}]", actorId);
+            auto row = node->dfs()->read_vector_row(raccoon_id, search_result->file_id, actor_id->to_string());
+            subscribed = row.has_value();
 
             crow::json::wvalue response;
             response["actor_id"]   = actor_id.value().to_string();
             response["active"]     = subscribeActive;
             response["subscribed"] = subscribed;
-
             return crow::response(200, response);
         });
 
     CROW_ROUTE(app, "/get_actor")
-        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
-            auto keys = req.url_params.keys();
+        .methods("GET"_method)([&](const crow::request& req) {
+            if (auto err = check_token_get(req)) return std::move(*err);
 
             auto id = req.url_params.get("id");
-            auto token_param    = std::string(req.url_params.get("token"));
-            if (!id) {
-                return crow::response(400, R"({"error": "id required"})");
-            }
-            if (token_param.empty()) {
-                return crow::response(400, R"({"error": "token is empty."})");
-            }
-            if (token_param != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+            if (!id) return json_error(400, "id required");
 
+            auto actor_id = ActorId::create(id);
+            if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
 
-            auto res = node->actor_index()->read_actor(ActorId(id));
-            if (res.has_value())
-            {
-                crow::json::wvalue response;
-                response["public_key"]     = Utils::to_base64(res.value().key().public_key());
+            auto res = node->actor_index()->read_actor(actor_id.value());
+            if (!res.has_value()) return json_error(400, "No actor");
 
-                return crow::response(200, response);
-            }
-
-            return crow::response(400, R"({"error": "No actor"})");
+            crow::json::wvalue response;
+            response["public_key"] = Utils::to_base64(res.value().key().public_key());
+            return crow::response(200, response);
         });
 
     CROW_ROUTE(app, "/verify_actor")
-        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
-            auto keys = req.url_params.keys();
+        .methods("GET"_method)([&](const crow::request& req) {
+            if (auto err = check_token_get(req)) return std::move(*err);
 
-            auto id = req.url_params.get("id");
+            auto id      = req.url_params.get("id");
             auto sig_str = req.url_params.get("signature");
-            auto token_param    = std::string(req.url_params.get("token"));
-            if (!id) {
-                return crow::response(400, R"({"error": "id required"})");
-            }
-            if (!sig_str) {
-                return crow::response(400, R"({"error": "signature required"})");
-            }
-            if (token_param.empty()) {
-                return crow::response(400, R"({"error": "token is empty."})");
-            }
-            if (token_param != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+            if (!id) return json_error(400, "id required");
+            if (!sig_str) return json_error(400, "signature required");
 
+            auto actor_id = ActorId::create(id);
+            if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
 
-            auto actor_data =node->actor_index()->read_actor(ActorId(id));
-            if (!actor_data.has_value()) {
-                return crow::response(400, R"({"error": "No data"})");
-            }
+            auto actor_data = node->actor_index()->read_actor(actor_id.value());
+            if (!actor_data.has_value()) return json_error(400, "No actor");
 
-            auto decoded_sig =  Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
-            if (!decoded_sig) {
-                return crow::response(400, R"({"error": "Base64 decoding failed."})");
-            }
+            auto decoded_sig = Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
+            if (!decoded_sig) return json_error(400, "Base64 decoding failed");
 
             const auto& decoded = decoded_sig.value();
-            if (decoded.size() != crypto_sign_BYTES) {
-                return crow::response(400, R"({"error": "Invalid signature length."})");
-            }
+            if (decoded.size() != crypto_sign_BYTES) return json_error(400, "Invalid signature length");
 
             Signature signature;
             std::copy(decoded.begin(), decoded.end(), signature.begin());
 
             auto res = actor_data->key().verify(id, signature);
-
-            if (!res.has_value()) {
-                return crow::response(400, R"({"error": "No data"})");
-            }
+            if (!res.has_value()) return json_error(400, "verification failed");
 
             crow::json::wvalue response;
-            response["result"]     = res.value();
-
+            response["result"] = res.value();
             return crow::response(200, response);
         });
 
-    CROW_ROUTE(app, "/get_devices")
-        .methods("GET"_method)([&node, &token_session, &contains](const crow::request& req) {
-            auto keys = req.url_params.keys();
+    CROW_ROUTE(app, "/mint").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json) return json_error(400, "invalid json");
+        if (auto err = check_token_post(json)) return std::move(*err);
+        if (!json.has("actor_id")) return json_error(400, "actor_id required");
+        if (!json.has("amount")) return json_error(400, "amount required");
 
-            auto token_param    = std::string(req.url_params.get("token"));
-            if (token_param.empty()) {
-                return crow::response(400, R"({"error": "token is empty."})");
-            }
-            if (token_param != token_session) {
-                return crow::response(400, R"({"error": "token is not valid."})");
-            }
+        std::string actorIdStr = json["actor_id"].s();
+        auto        receiver   = ActorId::create(actorIdStr);
+        if (!receiver.has_value()) return json_error(400, "invalid actor_id");
 
+        if (!node->actor_index()->exists(receiver.value())) return json_error(404, "actor not found");
 
-            if (true)
-            {
-                std::string jsonTemp = R"([
-                    {
-                        "gpu_model": "NVIDIA GeForce RTX 4090",
-                        "gpu_count": 1,
-                        "cpu_model": "AMD Ryzen 9 7950X",
-                        "cpu_cores": 16,
-                        "ram": 32768,
-                        "vram": 24576,
-                        "ssd": true
-                    },
-                    {
-                        "gpu_model": "NVIDIA A100",
-                        "gpu_count": 4,
-                        "cpu_model": "Intel Xeon Platinum 8380",
-                        "cpu_cores": 40,
-                        "ram": 262144,
-                        "vram": 40960,
-                        "ssd": true
-                    },
-                    {
-                        "gpu_model": "AMD Radeon RX 7900 XTX",
-                        "gpu_count": 2,
-                        "cpu_model": "AMD Ryzen Threadripper PRO 5995WX",
-                        "cpu_cores": 64,
-                        "ram": 131072,
-                        "vram": 24576,
-                        "ssd": true
-                    },
-                    {
-                        "gpu_model": "NVIDIA RTX 6000 Ada",
-                        "gpu_count": 1,
-                        "cpu_model": "Intel Core i9-14900K",
-                        "cpu_cores": 24,
-                        "ram": 65536,
-                        "vram": 49152,
-                        "ssd": true
-                    },
-                    {
-                        "gpu_model": "NVIDIA GeForce RTX 4070 Ti",
-                        "gpu_count": 1,
-                        "cpu_model": "Intel Core i7-13700K",
-                        "cpu_cores": 16,
-                        "ram": 32768,
-                        "vram": 12288,
-                        "ssd": true
-                    }
-                ])";
+        std::string amountStr  = json["amount"].s();
+        auto        amount_res = BigNumberFloat::create(amountStr, NumeralBase::Dec);
+        if (!amount_res.has_value()) return json_error(400, "invalid amount");
+        BigNumberFloat amount = amount_res.value();
+        if (amount <= 0) return json_error(400, "amount must be positive");
+        if (amount > 5000) return json_error(400, "amount exceeds maximum of 5000");
 
-                auto parsed_json = crow::json::load(jsonTemp);
-                if (!parsed_json) {
-                    return crow::response(400, "Invalid JSON format");
-                }
+        QFile minting_file("minting_actor.json");
+        if (!minting_file.open(QIODevice::ReadOnly))
+            return json_error(500, "failed to open minting_actor.json");
+        auto owner_actor = Actor<KeyPrivate>::fromJson(minting_file.readAll());
+        minting_file.close();
+        if (owner_actor.empty()) return json_error(500, "failed to load owner actor");
 
-                crow::json::wvalue response;
-                response["result"] = parsed_json;
-                return crow::response(200, response);
-            }
+        Transaction tx;
+        tx.set_sender(owner_actor.id());
+        tx.set_receiver(receiver.value());
+        tx.set_amount(amount);
+        tx.set_token(TokenId("468faf2f1be6504a9a26f7f027f7e43380b0d77d"));
+        tx.set_type(TransactionType::Minting);
 
-            return crow::response(400, R"({"error": "No data"})");
-        });
+        auto result = node->dag()->send_transaction(tx, owner_actor);
+        if (!result.has_value()) {
+            return json_error(500, "transaction failed: " + Utils::enum_value_name_value(result.error()));
+        }
 
-    std::uint16_t port = 8080;
+        eLog("[api] [POST] [mint] [receiver: {}] [amount: {}]", actorIdStr, amountStr);
+
+        crow::json::wvalue response;
+        response["hash"]     = result.value().hash();
+        response["receiver"] = receiver.value().to_string();
+        response["amount"]   = amountStr;
+        return crow::response(200, response);
+    });
+
+    std::uint16_t port = 17581;
     app.bindaddr("127.0.0.1").port(port).concurrency(2).run();
     eLog("Started api on port {}", port);
 }
