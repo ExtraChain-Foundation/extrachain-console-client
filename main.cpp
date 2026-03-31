@@ -583,8 +583,9 @@ int main(int argc, char* argv[]) {
         return;
     });
 
-    if (RUN_API)
+    if (RUN_API) {
         run_api(node);
+    }
 
     return app.exec();
 }
