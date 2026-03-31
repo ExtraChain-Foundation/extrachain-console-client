@@ -368,6 +368,6 @@ void run_api(ExtraChainNode* node) {
     });
 
     std::uint16_t port = 17581;
-    app.bindaddr("127.0.0.1").port(port).concurrency(2).run();
+    app.bindaddr("0.0.0.0").port(port).concurrency(2).run();
     eLog("Started api on port {}", port);
 }
