@@ -21,6 +21,7 @@
 
 #include "crow.h"
 #include <chrono>
+#include <mutex>
 #include <regex>
 #include <QFile>
 
@@ -319,6 +320,7 @@ void run_api(ExtraChainNode* node) {
             return crow::response(200, response);
         });
 
+    static std::mutex mint_mutex;
     CROW_ROUTE(app, "/mint").methods("POST"_method)([&](const crow::request& req) {
         auto json = crow::json::load(req.body);
         if (!json) return json_error(400, "invalid json");
@@ -353,6 +355,7 @@ void run_api(ExtraChainNode* node) {
         tx.set_token(TokenId("468faf2f1be6504a9a26f7f027f7e43380b0d77d"));
         tx.set_type(TransactionType::Minting);
 
+        std::lock_guard<std::mutex> lock(mint_mutex);
         auto result = node->dag()->send_transaction(tx, owner_actor);
         if (!result.has_value()) {
             return json_error(500, "transaction failed: " + Utils::enum_value_name_value(result.error()));
