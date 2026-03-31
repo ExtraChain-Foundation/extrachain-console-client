@@ -32,7 +32,6 @@
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
-#include "managers/logs_manager.h"
 #include "utils/exc_logs.h"
 #include "metatypes.h"
 
@@ -220,6 +219,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
     QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
+    QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
+    QCommandLineOption channelsVectorOption("create-channels-vector", "Create channels vector");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -249,7 +250,9 @@ int main(int argc, char* argv[]) {
                         dfsMode,
                         regenControls,
                         renamesOption,
-                        thothOption });
+                        thothOption,
+                        fileIdOption,
+                        channelsVectorOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -278,22 +281,21 @@ int main(int argc, char* argv[]) {
     //        return -1;
     //    }
 
-    LogsManager::debugLogs = parser.isSet(debugLogsOption);
+    bool debug_logs = parser.isSet(debugLogsOption);
 #ifdef QT_DEBUG
-    LogsManager::debugLogs = !parser.isSet(debugLogsOption);
-    Network::networkDebug  = parser.isSet(netdebOption);
-    eInfo("Debug logs enabled: {}", LogsManager::debugLogs);
+    debug_logs = !parser.isSet(debugLogsOption);
+    Network::networkDebug = parser.isSet(netdebOption);
+    eInfo("Debug logs enabled: {}", debug_logs);
 #endif
-    Logger::instance().set_debug(true); // LogsManager::debugLogs);
-
-    LogsManager::onFile();
+    Logger::instance().set_debug(true);
+    Logger::start_file("extrachain");
 
     eInfo(" ┌───────────────────────────────────────────┐");
     eInfo(" │          ExtraChain {}.{}          │", extrachain_version, COMPILE_DATE);
-    if (LogsManager::debugLogs)
+    if (debug_logs)
         eInfo(" │     Console: {} | Core: {}     │", GIT_COMMIT, GIT_COMMIT_CORE);
     eInfo(" └───────────────────────────────────────────┘");
-    LogsManager::etHandler();
+    install_qt_log_handler();
     qInfo().noquote().nospace() << "[Build Info] " << Utils::detect_compiler() << ", Qt " << QT_VERSION_STR
                                 << ", SQLite " << DbConnector::sqlite_version() << ", Sodium "
                                 << Utils::sodium_version().c_str() << ", Boost " << Utils::boost_version();
@@ -308,8 +310,8 @@ int main(int argc, char* argv[]) {
     if (!dirName.isEmpty())
         eLog("Custom data directory: {}", dirName);
 
-    if (LogsManager::debugLogs)
-        LogsManager::print("");
+    if (debug_logs)
+        fmt::println("");
 
     QString arg_login    = parser.value(loginOption);
     QString arg_password = parser.value(passOption);
@@ -319,13 +321,13 @@ int main(int argc, char* argv[]) {
                            ? ConsoleManager::getSomething("password")
                            : arg_password;
     if (arg_login.isEmpty() || arg_password.isEmpty())
-        LogsManager::print("");
+        fmt::println("");
     if (parser.isSet(inputOption))
         eLog("[Console] Input off");
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app);
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17593);
     auto                   node         = node_wrapper->node;
     node_wrapper->init(true);
 
@@ -408,7 +410,6 @@ int main(int argc, char* argv[]) {
             node->create_new_dag();
         }
 
-        //
         bool is_token = parser.isSet(tokenOption);
         if (is_token || is_new_network) {
             bool res1 = node->create_token_template();
@@ -489,6 +490,35 @@ int main(int argc, char* argv[]) {
             } else {
                 eSuccess("Chat templates created");
             }
+        }
+
+        bool file_id_create = parser.isSet(fileIdOption);
+        if (file_id_create || is_new_network) {
+            auto res = node->create_file_id_template(Dfs::FileIdState::Without);
+            if (!res) {
+                eInfo("Can't create file id templates");
+            } else {
+                eSuccess("File id template created");
+            }
+
+            auto res2 = node->create_file_id_template(Dfs::FileIdState::With);
+            if (!res2) {
+                eInfo("Can't create file id state templates");
+            } else {
+                eSuccess("File id state template created");
+            }
+        }
+
+        bool channels_vector_create = parser.isSet(channelsVectorOption);
+        if (channels_vector_create || is_new_network) {
+            // auto res = node->create_channels_vector();
+            // if (res == DfsFileStatus::CantCreate) {
+            //     eInfo("Can't create channels vector");
+            // } else if (res == DfsFileStatus::Created) {
+            //     eSuccess("Channels vector created");
+            // } else {
+            //     eSuccess("Channels vector already exists");
+            // }
         }
 
         bool is_mega = false; // parser.isSet(megaOption);
