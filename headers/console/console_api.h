@@ -24,4 +24,4 @@
 class ExtraChainNode;
 
 long long parseTimeToMs(const std::string& time_str);
-void      run_api(ExtraChainNode* node);
+void      run_api(ExtraChainNode* node, const std::string& api_token);

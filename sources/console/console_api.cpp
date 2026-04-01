@@ -53,9 +53,9 @@ long long parseTimeToMs(const std::string& time_str) {
     return totalMs > 0 ? totalMs : 24 * 60 * 60 * 1000;
 }
 
-void run_api(ExtraChainNode* node) {
+void run_api(ExtraChainNode* node, const std::string& api_token) {
     crow::SimpleApp app;
-    std::string     token_session = "26981bbf8819c458b971861591fdc5e3ecc0876e0e3742d8634d79680fc8e89c";
+    std::string     token_session = api_token;
     eLog("API runned.");
 
     auto json_error = [](int code, const std::string& message) {
