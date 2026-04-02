@@ -10,6 +10,13 @@ To start the API, pass `--api-token` on launch:
 ./extrachain-console --api-token <your_token>
 ```
 
+**Error format:** All error responses use the following JSON structure:
+```json
+{
+  "error": "error message"
+}
+```
+
 ---
 
 ## Endpoints
