@@ -10,6 +10,12 @@ To start the API, pass `--api-token` on launch:
 ./extrachain-console --api-token <your_token>
 ```
 
+**Requirements:** The `/mint` endpoint requires a `minting_actor.json` file placed next to the binary:
+```json
+["<owner_actor_id>", 1, "<public_key_base64>", "<secret_key_base64>"]
+```
+If the file is missing, `/mint` will return `500 failed to open minting_actor.json`.
+
 **Error format:** All error responses use the following JSON structure:
 ```json
 {
