@@ -35,6 +35,8 @@
 #include "utils/exc_logs.h"
 #include "metatypes.h"
 
+#include "console/console_api.h"
+
 #ifdef Q_OS_LINUX
     #include <execinfo.h>
 #endif
@@ -224,6 +226,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
+    QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -250,7 +253,8 @@ int main(int argc, char* argv[]) {
                         renamesOption,
                         thothOption,
                         fileIdOption,
-                        channelsVectorOption });
+                        channelsVectorOption,
+                        apiTokenOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -608,9 +612,15 @@ int main(int argc, char* argv[]) {
 
         // node->dag()->sum_all_rewards();
         // node->dag()->cache_log();
-
         return;
     });
+
+    QString api_token = parser.value(apiTokenOption);
+    if (RUN_API && !api_token.isEmpty()) {
+        run_api(node, api_token.toStdString());
+    } else if (RUN_API) {
+        eLog("[API] Not started: --api-token not provided");
+    }
 
     return app.exec();
 }
