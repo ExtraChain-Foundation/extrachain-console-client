@@ -223,6 +223,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption channelsVectorOption("create-channels-vector", "Create channels vector");
     QCommandLineOption tokenAllocationsOption("create-token-allocations",
                                              "Create token allocations dictionary for minting freeze");
+    QCommandLineOption backfillTokenAllocationsOption("backfill-token-allocations",
+                                                     "Backfill token allocations from chain (April 1 2026 to now)");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
@@ -257,6 +259,7 @@ int main(int argc, char* argv[]) {
                         fileIdOption,
                         channelsVectorOption,
                         tokenAllocationsOption,
+                        backfillTokenAllocationsOption,
                         apiTokenOption });
     parser.process(app);
 
@@ -535,6 +538,11 @@ int main(int argc, char* argv[]) {
             } else {
                 eInfo("Can't create token allocations dictionary");
             }
+        }
+
+        if (parser.isSet(backfillTokenAllocationsOption)) {
+            node->backfill_token_allocations();
+            eSuccess("Token allocations backfill started in background");
         }
 
         bool is_mega = false; // parser.isSet(megaOption);
