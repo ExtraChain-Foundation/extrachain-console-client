@@ -368,11 +368,13 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             node->dfs()->get_db_instance(), network_id, Dfs::Basic::TEMPLATE_DICTIONARY, "token_allocations");
         if (alloc_row.has_value()) {
             std::string alloc_key = fmt::format("{}:{}", actorIdStr, tx.token().to_string());
-            auto current_str    = node->dfs()->read_dictionary(network_id, alloc_row->file_id, alloc_key);
-            auto current_parsed = (current_str.has_value() && !current_str->empty())
-                                      ? BigNumberFloat::create(*current_str, NumeralBase::Dec)
-                                      : std::unexpected(BigNumberError::InvalidInput);
-            BigNumberFloat current_minted = current_parsed.has_value() ? current_parsed.value() : BigNumberFloat(0);
+            auto           current_str   = node->dfs()->read_dictionary(network_id, alloc_row->file_id, alloc_key);
+            BigNumberFloat current_minted(0);
+            if (current_str.has_value() && !current_str->empty()) {
+                auto parsed = BigNumberFloat::create(*current_str, NumeralBase::Dec);
+                if (parsed.has_value())
+                    current_minted = parsed.value();
+            }
             current_minted += amount;
             node->dfs()->dictionary_set_value(network_id, alloc_row->file_id, alloc_key,
                                               current_minted.to_string(NumeralBase::Dec), network_id);
