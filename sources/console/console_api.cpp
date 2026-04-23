@@ -321,7 +321,8 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         });
 
     static std::mutex mint_mutex;
-    CROW_ROUTE(app, "/mint").methods("POST"_method)([&](const crow::request& req) {
+    CROW_ROUTE(app, "/mint").methods("POST"_method)([&](const crow::request& req) -> crow::response {
+        try {
         auto json = crow::json::load(req.body);
         if (!json) return json_error(400, "invalid json");
         if (auto err = check_token_post(json)) return std::move(*err);
@@ -361,6 +362,26 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             return json_error(500, "transaction failed: " + Utils::enum_value_name_value(result.error()));
         }
 
+        // Update token_allocations dictionary: accumulate minted amount for this actor
+        auto network_id = node->actor_index()->network_id();
+        auto alloc_row  = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+            node->dfs()->get_db_instance(), network_id, Dfs::Basic::TEMPLATE_DICTIONARY, "token_allocations");
+        if (alloc_row.has_value()) {
+            std::string alloc_key = fmt::format("{}:{}", actorIdStr, tx.token().to_string());
+            auto           current_str   = node->dfs()->read_dictionary(network_id, alloc_row->file_id, alloc_key);
+            BigNumberFloat current_minted(0);
+            if (current_str.has_value() && !current_str->empty()) {
+                auto parsed = BigNumberFloat::create(*current_str, NumeralBase::Dec);
+                if (parsed.has_value())
+                    current_minted = parsed.value();
+            }
+            current_minted += amount;
+            node->dfs()->dictionary_set_value(network_id, alloc_row->file_id, alloc_key,
+                                              current_minted.to_string(NumeralBase::Dec), network_id);
+        } else {
+            eWarning("[api] [mint] token_allocations dictionary not found, skipping freeze tracking");
+        }
+
         eLog("[api] [POST] [mint] [receiver: {}] [amount: {}]", actorIdStr, amountStr);
 
         crow::json::wvalue response;
@@ -368,6 +389,11 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         response["receiver"] = receiver.value().to_string();
         response["amount"]   = amountStr;
         return crow::response(200, response);
+        } catch (const std::exception& e) {
+            return json_error(500, fmt::format("internal error: {}", e.what()));
+        } catch (...) {
+            return json_error(500, "internal error");
+        }
     });
 
     std::uint16_t port = 17581;
