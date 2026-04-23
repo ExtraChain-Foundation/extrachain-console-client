@@ -74,17 +74,30 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
     };
 
     if (auto owner = load_mint_actor(); owner.has_value()) {
-        auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
-            node->dfs()->get_db_instance(), owner->id(), Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
-        if (sub_search.has_value()) {
-            eLog("[api] subscriptions dictionary exists: {}", sub_search->file_id);
+        if (node->account_controller()->empty()) {
+            eCritical("[api] no profiles loaded — can't register mint actor, subscriptions init skipped");
         } else {
-            auto dict_res = node->dfs()->store_dictionary(owner->id(), owner->id(), "subscriptions");
-            if (!dict_res.has_value()) {
-                eCritical("[api] can't create subscriptions dictionary: {}",
-                          Utils::enum_value_name_value(dict_res.error()));
+            const auto& cur = node->account_controller()->current_profile();
+            if (!cur.get_actor(owner->id()).has_value()) {
+                auto sys_id = cur.system_id();
+                node->account_controller()->profile(sys_id).add_wallet(owner.value());
+                eLog("[api] mint actor {} added to current profile", owner->id());
             } else {
-                eSuccess("[api] subscriptions dictionary created: {}", dict_res->file_id);
+                eLog("[api] mint actor {} already in profile", owner->id());
+            }
+
+            auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                node->dfs()->get_db_instance(), owner->id(), Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
+            if (sub_search.has_value()) {
+                eLog("[api] subscriptions dictionary exists: {}", sub_search->file_id);
+            } else {
+                auto dict_res = node->dfs()->store_dictionary(owner->id(), owner->id(), "SubscriptionsPay");
+                if (!dict_res.has_value()) {
+                    eCritical("[api] can't create subscriptions dictionary: {}",
+                              Utils::enum_value_name_value(dict_res.error()));
+                } else {
+                    eSuccess("[api] subscriptions dictionary created: {}", dict_res->file_id);
+                }
             }
         }
     } else {
@@ -446,28 +459,19 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
             auto sub_row = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
                 node->dfs()->get_db_instance(), owner_actor.id(),
-                Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
+                Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
             if (!sub_row.has_value()) return json_error(500, "subscriptions dictionary not found");
 
             std::lock_guard<std::mutex> lock(subscription_mutex);
 
-            auto current_str = node->dfs()->read_dictionary(owner_actor.id(), sub_row->file_id, actorIdStr);
-            std::uint64_t final_until = until_ms;
-            if (current_str.has_value() && !current_str->empty()) {
-                try {
-                    std::uint64_t existing = std::stoull(*current_str);
-                    if (existing > final_until) final_until = existing;
-                } catch (...) {}
-            }
-
             node->dfs()->dictionary_set_value(owner_actor.id(), sub_row->file_id, actorIdStr,
-                                              std::to_string(final_until), owner_actor.id());
+                                              std::to_string(until_ms), owner_actor.id());
 
-            eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}]", actorIdStr, final_until);
+            eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}]", actorIdStr, until_ms);
 
             crow::json::wvalue response;
             response["actor_id"] = actorIdStr;
-            response["until_ms"] = final_until;
+            response["until_ms"] = until_ms;
             return crow::response(200, response);
         } catch (const std::exception& e) {
             return json_error(500, fmt::format("internal error: {}", e.what()));
@@ -492,7 +496,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
             auto sub_row = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
                 node->dfs()->get_db_instance(), owner_actor.id(),
-                Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
+                Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
             if (!sub_row.has_value()) return json_error(500, "subscriptions dictionary not found");
 
             auto value = node->dfs()->read_dictionary(owner_actor.id(), sub_row->file_id, actor->to_string());

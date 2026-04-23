@@ -634,15 +634,16 @@ int main(int argc, char* argv[]) {
 
         // node->dag()->sum_all_rewards();
         // node->dag()->cache_log();
+
+        QString api_token = parser.value(apiTokenOption);
+        if (RUN_API && !api_token.isEmpty()) {
+            run_api(node, api_token.toStdString());
+        } else if (RUN_API) {
+            eLog("[API] Not started: --api-token not provided");
+        }
+
         return;
     });
-
-    QString api_token = parser.value(apiTokenOption);
-    if (RUN_API && !api_token.isEmpty()) {
-        run_api(node, api_token.toStdString());
-    } else if (RUN_API) {
-        eLog("[API] Not started: --api-token not provided");
-    }
 
     return app.exec();
 }
