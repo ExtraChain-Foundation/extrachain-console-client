@@ -64,6 +64,33 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         return crow::response(code, err);
     };
 
+    auto load_mint_actor = []() -> std::optional<Actor<KeyPrivate>> {
+        QFile f("minting_actor.json");
+        if (!f.open(QIODevice::ReadOnly)) return std::nullopt;
+        auto a = Actor<KeyPrivate>::fromJson(f.readAll());
+        f.close();
+        if (a.empty()) return std::nullopt;
+        return a;
+    };
+
+    if (auto owner = load_mint_actor(); owner.has_value()) {
+        auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+            node->dfs()->get_db_instance(), owner->id(), Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
+        if (sub_search.has_value()) {
+            eLog("[api] subscriptions dictionary exists: {}", sub_search->file_id);
+        } else {
+            auto dict_res = node->dfs()->store_dictionary(owner->id(), owner->id(), "subscriptions");
+            if (!dict_res.has_value()) {
+                eCritical("[api] can't create subscriptions dictionary: {}",
+                          Utils::enum_value_name_value(dict_res.error()));
+            } else {
+                eSuccess("[api] subscriptions dictionary created: {}", dict_res->file_id);
+            }
+        }
+    } else {
+        eCritical("[api] failed to load minting_actor.json — subscriptions init skipped");
+    }
+
     auto check_token_post = [&](const crow::json::rvalue& json) -> std::optional<crow::response> {
         if (!json.has("token")) return json_error(400, "token required");
         std::string token = std::string(json["token"].s());
@@ -342,12 +369,9 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         if (amount <= 0) return json_error(400, "amount must be positive");
         if (amount > 5000) return json_error(400, "amount exceeds maximum of 5000");
 
-        QFile minting_file("minting_actor.json");
-        if (!minting_file.open(QIODevice::ReadOnly))
-            return json_error(500, "failed to open minting_actor.json");
-        auto owner_actor = Actor<KeyPrivate>::fromJson(minting_file.readAll());
-        minting_file.close();
-        if (owner_actor.empty()) return json_error(500, "failed to load owner actor");
+        auto owner_opt = load_mint_actor();
+        if (!owner_opt.has_value()) return json_error(500, "failed to load owner actor");
+        auto owner_actor = owner_opt.value();
 
         Transaction tx;
         tx.set_sender(owner_actor.id());
@@ -389,6 +413,106 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         response["receiver"] = receiver.value().to_string();
         response["amount"]   = amountStr;
         return crow::response(200, response);
+        } catch (const std::exception& e) {
+            return json_error(500, fmt::format("internal error: {}", e.what()));
+        } catch (...) {
+            return json_error(500, "internal error");
+        }
+    });
+
+    static std::mutex subscription_mutex;
+    CROW_ROUTE(app, "/subscription_add").methods("POST"_method)([&](const crow::request& req) -> crow::response {
+        try {
+            auto json = crow::json::load(req.body);
+            if (!json) return json_error(400, "invalid json");
+            if (auto err = check_token_post(json)) return std::move(*err);
+            if (!json.has("actor_id")) return json_error(400, "actor_id required");
+            if (!json.has("until_ms")) return json_error(400, "until_ms required");
+
+            std::string actorIdStr = json["actor_id"].s();
+            auto        actor      = ActorId::create(actorIdStr);
+            if (!actor.has_value()) return json_error(400, "invalid actor_id");
+            if (!node->actor_index()->exists(actor.value())) return json_error(404, "actor not found");
+
+            std::uint64_t until_ms = json["until_ms"].u();
+            auto now_ms = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+            if (until_ms <= now_ms) return json_error(400, "until_ms must be in the future");
+
+            auto owner_opt = load_mint_actor();
+            if (!owner_opt.has_value()) return json_error(500, "failed to load owner actor");
+            auto owner_actor = owner_opt.value();
+
+            auto sub_row = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                node->dfs()->get_db_instance(), owner_actor.id(),
+                Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
+            if (!sub_row.has_value()) return json_error(500, "subscriptions dictionary not found");
+
+            std::lock_guard<std::mutex> lock(subscription_mutex);
+
+            auto current_str = node->dfs()->read_dictionary(owner_actor.id(), sub_row->file_id, actorIdStr);
+            std::uint64_t final_until = until_ms;
+            if (current_str.has_value() && !current_str->empty()) {
+                try {
+                    std::uint64_t existing = std::stoull(*current_str);
+                    if (existing > final_until) final_until = existing;
+                } catch (...) {}
+            }
+
+            node->dfs()->dictionary_set_value(owner_actor.id(), sub_row->file_id, actorIdStr,
+                                              std::to_string(final_until), owner_actor.id());
+
+            eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}]", actorIdStr, final_until);
+
+            crow::json::wvalue response;
+            response["actor_id"] = actorIdStr;
+            response["until_ms"] = final_until;
+            return crow::response(200, response);
+        } catch (const std::exception& e) {
+            return json_error(500, fmt::format("internal error: {}", e.what()));
+        } catch (...) {
+            return json_error(500, "internal error");
+        }
+    });
+
+    CROW_ROUTE(app, "/subscription_check").methods("GET"_method)([&](const crow::request& req) -> crow::response {
+        try {
+            if (auto err = check_token_get(req)) return std::move(*err);
+
+            auto id = req.url_params.get("actor_id");
+            if (!id) return json_error(400, "actor_id required");
+
+            auto actor = ActorId::create(id);
+            if (!actor.has_value()) return json_error(400, "invalid actor_id");
+
+            auto owner_opt = load_mint_actor();
+            if (!owner_opt.has_value()) return json_error(500, "failed to load owner actor");
+            auto owner_actor = owner_opt.value();
+
+            auto sub_row = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                node->dfs()->get_db_instance(), owner_actor.id(),
+                Dfs::Basic::TEMPLATE_DICTIONARY, "subscriptions");
+            if (!sub_row.has_value()) return json_error(500, "subscriptions dictionary not found");
+
+            auto value = node->dfs()->read_dictionary(owner_actor.id(), sub_row->file_id, actor->to_string());
+
+            std::uint64_t until_ms = 0;
+            if (value.has_value() && !value->empty()) {
+                try { until_ms = std::stoull(*value); } catch (...) {}
+            }
+
+            auto now_ms = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+
+            eLog("[api] [GET] [subscription_check] [actor: {}]", actor->to_string());
+
+            crow::json::wvalue response;
+            response["actor_id"] = actor->to_string();
+            response["until_ms"] = until_ms;
+            response["active"]   = until_ms > now_ms;
+            return crow::response(200, response);
         } catch (const std::exception& e) {
             return json_error(500, fmt::format("internal error: {}", e.what()));
         } catch (...) {
