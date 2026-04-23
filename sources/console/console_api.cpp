@@ -482,9 +482,10 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             eLog("[api] [GET] [subscription_check] [actor: {}]", actor->to_string());
 
             crow::json::wvalue response;
-            response["actor_id"] = actor->to_string();
-            response["until_ms"] = until_ms;
-            response["active"]   = until_ms > now_ms;
+            response["actor_id"]     = actor->to_string();
+            response["until_ms"]     = until_ms;
+            response["active"]       = until_ms > now_ms;
+            response["remaining_ms"] = until_ms > now_ms ? until_ms - now_ms : 0;
             return crow::response(200, response);
         } catch (const std::exception& e) {
             return json_error(500, fmt::format("internal error: {}", e.what()));
