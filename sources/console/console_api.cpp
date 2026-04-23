@@ -73,37 +73,6 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         return a;
     };
 
-    if (auto owner = load_mint_actor(); owner.has_value()) {
-        if (node->account_controller()->empty()) {
-            eCritical("[api] no profiles loaded — can't register mint actor, subscriptions init skipped");
-        } else {
-            const auto& cur = node->account_controller()->current_profile();
-            if (!cur.get_actor(owner->id()).has_value()) {
-                auto sys_id = cur.system_id();
-                node->account_controller()->profile(sys_id).add_wallet(owner.value());
-                eLog("[api] mint actor {} added to current profile", owner->id());
-            } else {
-                eLog("[api] mint actor {} already in profile", owner->id());
-            }
-
-            auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
-                node->dfs()->get_db_instance(), owner->id(), Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
-            if (sub_search.has_value()) {
-                eLog("[api] subscriptions dictionary exists: {}", sub_search->file_id);
-            } else {
-                auto dict_res = node->dfs()->store_dictionary(owner->id(), owner->id(), "SubscriptionsPay");
-                if (!dict_res.has_value()) {
-                    eCritical("[api] can't create subscriptions dictionary: {}",
-                              Utils::enum_value_name_value(dict_res.error()));
-                } else {
-                    eSuccess("[api] subscriptions dictionary created: {}", dict_res->file_id);
-                }
-            }
-        }
-    } else {
-        eCritical("[api] failed to load minting_actor.json — subscriptions init skipped");
-    }
-
     auto check_token_post = [&](const crow::json::rvalue& json) -> std::optional<crow::response> {
         if (!json.has("token")) return json_error(400, "token required");
         std::string token = std::string(json["token"].s());

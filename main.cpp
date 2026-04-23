@@ -231,6 +231,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
+    QCommandLineOption createMintSubsOption("create-mint-subs",
+                                            "Register mint actor in profile and create SubscriptionsPay dictionary");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -260,7 +262,8 @@ int main(int argc, char* argv[]) {
                         channelsVectorOption,
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
-                        apiTokenOption });
+                        apiTokenOption,
+                        createMintSubsOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -545,6 +548,48 @@ int main(int argc, char* argv[]) {
             eSuccess("Token allocations backfill started in background");
         }
 
+        if (parser.isSet(createMintSubsOption) || is_new_network) {
+            QFile mint_file("minting_actor.json");
+            if (!mint_file.open(QIODevice::ReadOnly)) {
+                eCritical("[create-mint-subs] failed to open minting_actor.json");
+            } else {
+                auto mint_actor = Actor<KeyPrivate>::fromJson(mint_file.readAll());
+                mint_file.close();
+                if (mint_actor.empty()) {
+                    eCritical("[create-mint-subs] failed to parse minting_actor.json");
+                } else if (node->account_controller()->empty()) {
+                    eCritical("[create-mint-subs] no profiles loaded");
+                } else {
+                    const auto& cur = node->account_controller()->current_profile();
+                    if (!cur.get_actor(mint_actor.id()).has_value()) {
+                        auto sys_id = cur.system_id();
+                        node->account_controller()->profile(sys_id).add_wallet(mint_actor);
+                        eSuccess("[create-mint-subs] mint actor {} added to current profile", mint_actor.id());
+                    } else {
+                        eInfo("[create-mint-subs] mint actor {} already in profile", mint_actor.id());
+                    }
+
+                    auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                        node->dfs()->get_db_instance(), mint_actor.id(),
+                        Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
+                    if (sub_search.has_value()) {
+                        eInfo("[create-mint-subs] SubscriptionsPay dictionary already exists: {}",
+                              sub_search->file_id);
+                    } else {
+                        auto dict_res = node->dfs()->store_dictionary(mint_actor.id(), mint_actor.id(),
+                                                                      "SubscriptionsPay");
+                        if (!dict_res.has_value()) {
+                            eCritical("[create-mint-subs] can't create SubscriptionsPay dictionary: {}",
+                                      Utils::enum_value_name_value(dict_res.error()));
+                        } else {
+                            eSuccess("[create-mint-subs] SubscriptionsPay dictionary created: {}",
+                                     dict_res->file_id);
+                        }
+                    }
+                }
+            }
+        }
+
         bool is_mega = false; // parser.isSet(megaOption);
         if (is_mega) {
             /*
@@ -637,7 +682,9 @@ int main(int argc, char* argv[]) {
 
         QString api_token = parser.value(apiTokenOption);
         if (RUN_API && !api_token.isEmpty()) {
-            run_api(node, api_token.toStdString());
+            std::thread([node, token = api_token.toStdString()]() {
+                run_api(node, token);
+            }).detach();
         } else if (RUN_API) {
             eLog("[API] Not started: --api-token not provided");
         }
