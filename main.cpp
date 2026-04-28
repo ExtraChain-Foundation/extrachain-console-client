@@ -230,6 +230,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
+    QCommandLineOption rebuildIndexOption("rebuild-index",
+                                          "Rebuild ChainIndex from on-disk packs + hot sections");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
     QCommandLineOption createMintSubsOption("create-mint-subs",
                                             "Register mint actor in profile and create SubscriptionsPay dictionary");
@@ -263,7 +265,8 @@ int main(int argc, char* argv[]) {
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
                         apiTokenOption,
-                        createMintSubsOption });
+                        createMintSubsOption,
+                        rebuildIndexOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -546,6 +549,15 @@ int main(int argc, char* argv[]) {
         if (parser.isSet(backfillTokenAllocationsOption)) {
             node->backfill_token_allocations();
             eSuccess("Token allocations backfill started in background");
+        }
+
+        if (parser.isSet(rebuildIndexOption)) {
+            eInfo("[rebuild-index] Starting full ChainIndex rebuild...");
+            QElapsedTimer t;
+            t.start();
+            node->dag()->chain_index().rebuild_from_disk();
+            auto rows = node->dag()->chain_index().row_count();
+            eSuccess("[rebuild-index] Done in {} ms — {} tx indexed", t.elapsed(), rows);
         }
 
         if (parser.isSet(createMintSubsOption) || is_new_network) {

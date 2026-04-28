@@ -118,7 +118,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
         crow::json::wvalue response;
         response["actor_id"] = actor_id.value().to_string();
-        response["balance"]  = balance.to_string(NumeralBase::Dec);
+        response["balance"]  = balance.to_string();
         return crow::response(200, response);
     });
 
@@ -151,7 +151,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             response["hash"]     = hash;
             response["sender"]   = tx.sender().to_string();
             response["receiver"] = tx.receiver().to_string();
-            response["amount"]   = tx.amount().to_string(NumeralBase::Dec);
+            response["amount"]   = tx.amount().to_string();
             auto dateTime        = QDateTime::fromMSecsSinceEpoch(tx.timestamp());
             response["date"]     = dateTime.toString("dd/MM/yyyy").toStdString();
             response["time"]     = dateTime.toString("hh:mm:ss").toStdString();
@@ -177,7 +177,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             if (auto err = check_token_get(req)) return std::move(*err);
             eLog("[api] [GET] [count_sections]");
             crow::json::wvalue response;
-            response["count_sections"] = node->dag()->current_section().to_string(NumeralBase::Dec);
+            response["count_sections"] = node->dag()->current_section().to_string();
             return crow::response(200, response);
         });
 
@@ -219,20 +219,19 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         bool hasRewards  = false;
         int  rewardCount = 0;
 
-        const std::vector<BigNumber> sections = node->dag()->cache().read_index(actor_id.value());
-        for (const auto& section_id : sections) {
-            auto section = node->dag()->read_section(section_id);
-            if (!section.has_value()) continue;
-
-            for (const auto& tx : section.value().transactions) {
-                if (tx.type() == TransactionType::Reward) {
-                    if (tx.timestamp() >= cutoffTimeMs) {
-                        hasRewards = true;
-                        rewardCount++;
-                    } else {
-                        break;
-                    }
-                }
+        // ChainIndex returns tx metadata directly — no section read needed.
+        // We pull "received_by" since rewards arrive at the actor; no upper limit
+        // on rows (rewards window is already bounded by cutoffTimeMs).
+        const auto entries =
+            node->dag()->chain_index().find_received_by(actor_id.value().to_string(), {}, 0, 10000);
+        for (const auto& e : entries) {
+            if (e.type != static_cast<int>(TransactionType::Reward)) continue;
+            if (e.timestamp >= cutoffTimeMs) {
+                hasRewards = true;
+                rewardCount++;
+            } else {
+                // entries are timestamp-DESC, so first older-than-cutoff stops the scan
+                break;
             }
         }
 
@@ -345,7 +344,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         if (!node->actor_index()->exists(receiver.value())) return json_error(404, "actor not found");
 
         std::string amountStr  = json["amount"].s();
-        auto        amount_res = BigNumberFloat::create(amountStr, NumeralBase::Dec);
+        auto        amount_res = BigNumberFloat::create(amountStr);
         if (!amount_res.has_value()) return json_error(400, "invalid amount");
         BigNumberFloat amount = amount_res.value();
         if (amount <= 0) return json_error(400, "amount must be positive");
@@ -377,13 +376,13 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             auto           current_str   = node->dfs()->read_dictionary(network_id, alloc_row->file_id, alloc_key);
             BigNumberFloat current_minted(0);
             if (current_str.has_value() && !current_str->empty()) {
-                auto parsed = BigNumberFloat::create(*current_str, NumeralBase::Dec);
+                auto parsed = BigNumberFloat::create(*current_str);
                 if (parsed.has_value())
                     current_minted = parsed.value();
             }
             current_minted += amount;
             node->dfs()->dictionary_set_value(network_id, alloc_row->file_id, alloc_key,
-                                              current_minted.to_string(NumeralBase::Dec), network_id);
+                                              current_minted.to_string(), network_id);
         } else {
             eWarning("[api] [mint] token_allocations dictionary not found, skipping freeze tracking");
         }

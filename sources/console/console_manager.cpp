@@ -132,7 +132,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (sendtx.length() == 3) {
             QByteArray     toId   = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
-            eLog("transaction {} {}", toId, amount.to_string(NumeralBase::Dec));
+            eLog("transaction {} {}", toId, amount.to_string());
 
             ActorId receiver(toId.toStdString());
 
