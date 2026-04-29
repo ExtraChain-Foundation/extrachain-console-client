@@ -552,12 +552,16 @@ int main(int argc, char* argv[]) {
         }
 
         if (parser.isSet(rebuildIndexOption)) {
-            eInfo("[rebuild-index] Starting full ChainIndex rebuild...");
-            QElapsedTimer t;
-            t.start();
-            node->dag()->chain_index().rebuild_from_disk();
-            auto rows = node->dag()->chain_index().row_count();
-            eSuccess("[rebuild-index] Done in {} ms — {} tx indexed", t.elapsed(), rows);
+            auto *idx = node->dag()->chain_index();
+            if (!idx) {
+                eCritical("[rebuild-index] ChainIndex is disabled — set chain_index_mode=Enabled in settings");
+            } else {
+                eInfo("[rebuild-index] Starting full ChainIndex rebuild...");
+                QElapsedTimer t;
+                t.start();
+                idx->rebuild_from_disk();
+                eSuccess("[rebuild-index] Done in {} ms — {} tx indexed", t.elapsed(), idx->row_count());
+            }
         }
 
         if (parser.isSet(createMintSubsOption) || is_new_network) {

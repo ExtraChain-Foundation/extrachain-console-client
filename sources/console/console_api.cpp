@@ -219,19 +219,17 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         bool hasRewards  = false;
         int  rewardCount = 0;
 
-        // ChainIndex returns tx metadata directly — no section read needed.
-        // We pull "received_by" since rewards arrive at the actor; no upper limit
-        // on rows (rewards window is already bounded by cutoffTimeMs).
-        const auto entries =
-            node->dag()->chain_index().find_received_by(actor_id.value().to_string(), {}, 0, 10000);
-        for (const auto& e : entries) {
-            if (e.type != static_cast<int>(TransactionType::Reward)) continue;
-            if (e.timestamp >= cutoffTimeMs) {
-                hasRewards = true;
-                rewardCount++;
-            } else {
-                // entries are timestamp-DESC, so first older-than-cutoff stops the scan
-                break;
+        auto *idx = node->dag()->chain_index();
+        if (idx) {
+            const auto entries = idx->find_received_by(actor_id.value().to_string(), {}, 0, 10000);
+            for (const auto& e : entries) {
+                if (e.type != static_cast<int>(TransactionType::Reward)) continue;
+                if (e.timestamp >= cutoffTimeMs) {
+                    hasRewards = true;
+                    rewardCount++;
+                } else {
+                    break;
+                }
             }
         }
 
