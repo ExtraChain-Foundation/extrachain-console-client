@@ -523,14 +523,14 @@ int main(int argc, char* argv[]) {
 
         bool channels_vector_create = parser.isSet(channelsVectorOption);
         if (channels_vector_create || is_new_network) {
-            // auto res = node->create_channels_vector();
-            // if (res == DfsFileStatus::CantCreate) {
-            //     eInfo("Can't create channels vector");
-            // } else if (res == DfsFileStatus::Created) {
-            //     eSuccess("Channels vector created");
-            // } else {
-            //     eSuccess("Channels vector already exists");
-            // }
+            auto res = node->create_channels_vector();
+            if (res == DfsFileStatus::CantCreate) {
+                eInfo("Can't create channels vector");
+            } else if (res == DfsFileStatus::Created) {
+                eSuccess("Channels vector created");
+            } else {
+                eSuccess("Channels vector already exists");
+            }
         }
 
         bool is_token_allocations = parser.isSet(tokenAllocationsOption);
