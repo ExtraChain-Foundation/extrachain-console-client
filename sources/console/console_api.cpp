@@ -28,6 +28,49 @@
 #include "managers/extrachain_node.h"
 #include "chain/dag.h"
 #include "dfs/dfs_controller.h"
+#include "utils/exc_utils.h"
+#include <boost/describe.hpp>
+
+struct SubscriptionRecord {
+    std::uint64_t until_ms = 0;
+    int           plan     = 0;
+};
+BOOST_DESCRIBE_STRUCT(SubscriptionRecord, (), (until_ms, plan))
+
+namespace {
+std::string subscription_to_json(const SubscriptionRecord& rec) {
+    return Json::serialize(rec);
+}
+
+SubscriptionRecord subscription_from_value(const std::string& raw) {
+    SubscriptionRecord rec;
+    if (raw.empty())
+        return rec;
+
+    // Legacy
+    const bool looks_numeric =
+        raw.find_first_not_of("0123456789") == std::string::npos;
+    if (looks_numeric) {
+        try {
+            rec.until_ms = std::stoull(raw);
+        } catch (...) {
+        }
+        return rec;
+    }
+
+    // New
+    auto parsed = Json::deserialize<SubscriptionRecord>(raw);
+    if (parsed.has_value()) {
+        rec = parsed.value();
+    } else {
+        try {
+            rec.until_ms = std::stoull(raw);
+        } catch (...) {
+        }
+    }
+    return rec;
+}
+} // namespace
 
 long long parseTimeToMs(const std::string& time_str) {
     if (time_str.empty())
@@ -329,6 +372,42 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             return crow::response(200, response);
         });
 
+    CROW_ROUTE(app, "/verify_data")
+        .methods("POST"_method)([&](const crow::request& req) {
+            auto json = crow::json::load(req.body);
+            if (!json) return json_error(400, "invalid json");
+            if (auto err = check_token_post(json)) return std::move(*err);
+            if (!json.has("id")) return json_error(400, "id required");
+            if (!json.has("data")) return json_error(400, "data required");
+            if (!json.has("signature")) return json_error(400, "signature required");
+
+            std::string id_str   = json["id"].s();
+            std::string data_str = json["data"].s();
+            std::string sig_str  = json["signature"].s();
+
+            auto actor_id = ActorId::create(id_str);
+            if (!actor_id.has_value()) return json_error(400, "invalid actor_id");
+
+            auto actor_data = node->actor_index()->read_actor(actor_id.value());
+            if (!actor_data.has_value()) return json_error(400, "No actor");
+
+            auto decoded_sig = Utils::from_base64<std::vector<std::uint8_t>>(sig_str);
+            if (!decoded_sig) return json_error(400, "Base64 decoding failed");
+
+            const auto& decoded = decoded_sig.value();
+            if (decoded.size() != crypto_sign_BYTES) return json_error(400, "Invalid signature length");
+
+            Signature signature;
+            std::copy(decoded.begin(), decoded.end(), signature.begin());
+
+            auto res = actor_data->key().verify(data_str, signature);
+            if (!res.has_value()) return json_error(400, "verification failed");
+
+            crow::json::wvalue response;
+            response["result"] = res.value();
+            return crow::response(200, response);
+        });
+
     static std::mutex mint_mutex;
     CROW_ROUTE(app, "/mint").methods("POST"_method)([&](const crow::request& req) -> crow::response {
         try {
@@ -422,6 +501,10 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
                     std::chrono::system_clock::now().time_since_epoch()).count());
             if (until_ms <= now_ms) return json_error(400, "until_ms must be in the future");
 
+            SubscriptionRecord rec;
+            rec.until_ms = until_ms;
+            if (json.has("plan")) rec.plan = static_cast<int>(json["plan"].i());
+
             auto owner_opt = load_mint_actor();
             if (!owner_opt.has_value()) return json_error(500, "failed to load owner actor");
             auto owner_actor = owner_opt.value();
@@ -434,13 +517,15 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             std::lock_guard<std::mutex> lock(subscription_mutex);
 
             node->dfs()->dictionary_set_value(owner_actor.id(), sub_row->file_id, actorIdStr,
-                                              std::to_string(until_ms), owner_actor.id());
+                                              subscription_to_json(rec), owner_actor.id());
 
-            eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}]", actorIdStr, until_ms);
+            eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}] [plan: {}]",
+                 actorIdStr, until_ms, rec.plan);
 
             crow::json::wvalue response;
             response["actor_id"] = actorIdStr;
             response["until_ms"] = until_ms;
+            if (rec.plan != 0) response["plan"] = rec.plan;
             return crow::response(200, response);
         } catch (const std::exception& e) {
             return json_error(500, fmt::format("internal error: {}", e.what()));
@@ -470,10 +555,9 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
             auto value = node->dfs()->read_dictionary(owner_actor.id(), sub_row->file_id, actor->to_string());
 
-            std::uint64_t until_ms = 0;
-            if (value.has_value() && !value->empty()) {
-                try { until_ms = std::stoull(*value); } catch (...) {}
-            }
+            SubscriptionRecord rec;
+            if (value.has_value()) rec = subscription_from_value(*value);
+            std::uint64_t until_ms = rec.until_ms;
 
             auto now_ms = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -486,6 +570,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             response["until_ms"]     = until_ms;
             response["active"]       = until_ms > now_ms;
             response["remaining_ms"] = until_ms > now_ms ? until_ms - now_ms : 0;
+            if (rec.plan != 0) response["plan"] = rec.plan;
             return crow::response(200, response);
         } catch (const std::exception& e) {
             return json_error(500, fmt::format("internal error: {}", e.what()));
