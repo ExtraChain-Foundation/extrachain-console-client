@@ -230,9 +230,15 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
+    QCommandLineOption rebuildIndexOption("rebuild-index",
+                                          "Rebuild ChainIndex from on-disk packs + hot sections");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
     QCommandLineOption createMintSubsOption("create-mint-subs",
                                             "Register mint actor in profile and create SubscriptionsPay dictionary");
+    QCommandLineOption createChatUsernamesOption("create-chat-usernames",
+                                                 "Register mint actor in profile and create chat Usernames vector");
+    QCommandLineOption createChatChannelsOption("create-chat-channels",
+                                                "Register mint actor in profile and create chat Channels vector");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -263,7 +269,10 @@ int main(int argc, char* argv[]) {
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
                         apiTokenOption,
-                        createMintSubsOption });
+                        createMintSubsOption,
+                        createChatUsernamesOption,
+                        createChatChannelsOption,
+                        rebuildIndexOption });
     parser.process(app);
 
     // TODO: allow absolute directory
@@ -548,6 +557,19 @@ int main(int argc, char* argv[]) {
             eSuccess("Token allocations backfill started in background");
         }
 
+        // if (parser.isSet(rebuildIndexOption)) {
+        //     auto *idx = node->dag()->chain_index();
+        //     if (!idx) {
+        //         eCritical("[rebuild-index] ChainIndex is disabled — set chain_index_mode=Enabled in settings");
+        //     } else {
+        //         eInfo("[rebuild-index] Starting full ChainIndex rebuild...");
+        //         QElapsedTimer t;
+        //         t.start();
+        //         idx->rebuild_from_disk();
+        //         eSuccess("[rebuild-index] Done in {} ms — {} tx indexed", t.elapsed(), idx->row_count());
+        //     }
+        // }
+
         if (parser.isSet(createMintSubsOption) || is_new_network) {
             QFile mint_file("minting_actor.json");
             if (!mint_file.open(QIODevice::ReadOnly)) {
@@ -585,6 +607,78 @@ int main(int argc, char* argv[]) {
                             eSuccess("[create-mint-subs] SubscriptionsPay dictionary created: {}",
                                      dict_res->file_id);
                         }
+                    }
+                }
+            }
+        }
+
+        if (parser.isSet(createChatUsernamesOption)) {
+            QFile mint_file("minting_actor.json");
+            if (!mint_file.open(QIODevice::ReadOnly)) {
+                eCritical("[create-chat-usernames] failed to open minting_actor.json");
+            } else {
+                auto mint_actor = Actor<KeyPrivate>::fromJson(mint_file.readAll());
+                mint_file.close();
+                if (mint_actor.empty()) {
+                    eCritical("[create-chat-usernames] failed to parse minting_actor.json");
+                } else if (node->account_controller()->empty()) {
+                    eCritical("[create-chat-usernames] no profiles loaded");
+                } else {
+                    const auto& cur = node->account_controller()->current_profile();
+                    if (!cur.get_actor(mint_actor.id()).has_value()) {
+                        auto sys_id = cur.system_id();
+                        node->account_controller()->profile(sys_id).add_wallet(mint_actor);
+                        eSuccess("[create-chat-usernames] mint actor {} added to current profile",
+                                 mint_actor.id());
+                    } else {
+                        eInfo("[create-chat-usernames] mint actor {} already in profile", mint_actor.id());
+                    }
+
+                    auto existing = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                        node->dfs()->get_db_instance(), mint_actor.id(),
+                        Dfs::Basic::TEMPLATE_VECTOR, "Usernames");
+                    if (existing.has_value()) {
+                        eInfo("[create-chat-usernames] Usernames vector already exists: {}",
+                              existing->file_id);
+                    } else if (node->create_usernames_vector(mint_actor.id())) {
+                        eSuccess("[create-chat-usernames] chat Usernames vector created for {}",
+                                 mint_actor.id());
+                    } else {
+                        eCritical("[create-chat-usernames] can't create chat Usernames vector");
+                    }
+                }
+            }
+        }
+
+        if (parser.isSet(createChatChannelsOption)) {
+            QFile mint_file("minting_actor.json");
+            if (!mint_file.open(QIODevice::ReadOnly)) {
+                eCritical("[create-chat-channels] failed to open minting_actor.json");
+            } else {
+                auto mint_actor = Actor<KeyPrivate>::fromJson(mint_file.readAll());
+                mint_file.close();
+                if (mint_actor.empty()) {
+                    eCritical("[create-chat-channels] failed to parse minting_actor.json");
+                } else if (node->account_controller()->empty()) {
+                    eCritical("[create-chat-channels] no profiles loaded");
+                } else {
+                    const auto& cur = node->account_controller()->current_profile();
+                    if (!cur.get_actor(mint_actor.id()).has_value()) {
+                        auto sys_id = cur.system_id();
+                        node->account_controller()->profile(sys_id).add_wallet(mint_actor);
+                        eSuccess("[create-chat-channels] mint actor {} added to current profile",
+                                 mint_actor.id());
+                    } else {
+                        eInfo("[create-chat-channels] mint actor {} already in profile", mint_actor.id());
+                    }
+
+                    auto res = node->create_channels_vector(mint_actor.id());
+                    if (res == DfsFileStatus::CantCreate) {
+                        eCritical("[create-chat-channels] can't create chat Channels vector");
+                    } else if (res == DfsFileStatus::Created) {
+                        eSuccess("[create-chat-channels] chat Channels vector created for {}", mint_actor.id());
+                    } else {
+                        eInfo("[create-chat-channels] chat Channels vector already exists");
                     }
                 }
             }
