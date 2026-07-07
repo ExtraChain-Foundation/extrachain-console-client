@@ -27,6 +27,7 @@
 #include <csignal>
 
 #include "dfs/dfs_controller.h"
+#include "dfs/collection_template.h"
 #include "extrachain_version.h"
 #include "managers/thoth_manager.h"
 #include "utils/exc_utils.h"
@@ -166,6 +167,39 @@ bool SetupSignals() {
     }
 
     return true;
+}
+
+
+// Local vector creation on public DFS API: the server runs a stock dev core,
+// so these must not depend on chat-specific core methods.
+static bool createOwnedVector(ExtraChainNode*                 node,
+                              const ActorId&                  owner_id,
+                              const std::string&              name,
+                              const Dfs::CollectionTemplate&  vector_template) {
+    auto template_res = node->dfs()->store_template(owner_id, vector_template);
+    if (!template_res.has_value()) {
+        eCritical("[{}] can't store template: {}", name, template_res.error());
+        return false;
+    }
+    auto vec_res = node->dfs()->store_vector(owner_id, owner_id, name,
+                                             template_res->actor_id, template_res->file_id);
+    return vec_res.has_value();
+}
+
+static bool createChatUsernamesVector(ExtraChainNode* node, const ActorId& owner_id) {
+    auto tmpl = Dfs::CollectionTemplate::create("Usernames")
+                    .value()
+                    .add_fields({ Dfs::Field::String("name").unique() });
+    return createOwnedVector(node, owner_id, "Usernames", tmpl);
+}
+
+static bool createChatChannelsVector(ExtraChainNode* node, const ActorId& owner_id) {
+    auto tmpl = Dfs::CollectionTemplate::create("Channels")
+                    .value()
+                    .add_fields({ Dfs::Field::String("name"),
+                                  Dfs::Field::String("owner_id").not_null(),
+                                  Dfs::Field::String("file_id").unique().not_null() });
+    return createOwnedVector(node, owner_id, "Channels", tmpl);
 }
 
 int main(int argc, char* argv[]) {
@@ -640,7 +674,7 @@ int main(int argc, char* argv[]) {
                     if (existing.has_value()) {
                         eInfo("[create-chat-usernames] Usernames vector already exists: {}",
                               existing->file_id);
-                    } else if (node->create_usernames_vector(mint_actor.id())) {
+                    } else if (createChatUsernamesVector(node, mint_actor.id())) {
                         eSuccess("[create-chat-usernames] chat Usernames vector created for {}",
                                  mint_actor.id());
                     } else {
@@ -672,13 +706,16 @@ int main(int argc, char* argv[]) {
                         eInfo("[create-chat-channels] mint actor {} already in profile", mint_actor.id());
                     }
 
-                    auto res = node->create_channels_vector(mint_actor.id());
-                    if (res == DfsFileStatus::CantCreate) {
-                        eCritical("[create-chat-channels] can't create chat Channels vector");
-                    } else if (res == DfsFileStatus::Created) {
+                    auto existing = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
+                        node->dfs()->get_db_instance(), mint_actor.id(),
+                        Dfs::Basic::TEMPLATE_VECTOR, "Channels");
+                    if (existing.has_value()) {
+                        eInfo("[create-chat-channels] chat Channels vector already exists: {}",
+                              existing->file_id);
+                    } else if (createChatChannelsVector(node, mint_actor.id())) {
                         eSuccess("[create-chat-channels] chat Channels vector created for {}", mint_actor.id());
                     } else {
-                        eInfo("[create-chat-channels] chat Channels vector already exists");
+                        eCritical("[create-chat-channels] can't create chat Channels vector");
                     }
                 }
             }
