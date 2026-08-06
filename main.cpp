@@ -21,13 +21,17 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QLockFile>
 #include <QStandardPaths>
 
 #include <csignal>
 
 #include "dfs/dfs_controller.h"
+#include "contracts/contract_codec.h"
+#include "contracts/toolchain_registry.h"
 #include "extrachain_version.h"
+#include "managers/token_manager.h"
 #include "managers/thoth_manager.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
@@ -50,6 +54,181 @@
 #ifndef EXTRACHAIN_CMAKE
     #include "preconfig.h"
 #endif
+
+namespace {
+    struct OneShotOptions {
+        QString operation;
+        QString contract_id;
+        QString kind;
+        QString method;
+        QString arguments = "{}";
+        QString module;
+        QString token_name;
+        QString token_ticker;
+        QString token_supply;
+        int     token_decimals = 8;
+        QString project_name;
+        QString source;
+    };
+
+    std::expected<std::vector<std::uint8_t>, std::string> arguments(const QString& value) {
+        auto encoded =
+            ExtraChain::Contracts::Codec::encode_json(value.trimmed().isEmpty() ? "{}" : value.toStdString());
+        if (!encoded.has_value()) {
+            return std::unexpected(encoded.error().detail);
+        }
+        return *encoded;
+    }
+
+    std::expected<std::vector<std::uint8_t>, std::string> module_bytes(const QString& path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly) || file.size() <= 0) {
+            return std::unexpected("Cannot read the WebAssembly module");
+        }
+        const auto data = file.readAll();
+        return std::vector<std::uint8_t>(data.begin(), data.end());
+    }
+
+    int run_one_shot(ExtraChainNode* node, const OneShotOptions& options) {
+        if (options.operation.isEmpty()) {
+            return -1;
+        }
+        const auto fail = [](const std::string& message) {
+            fmt::println(stderr, "{{\"error\":{}}}", boost::json::serialize(message));
+            return 2;
+        };
+        if (options.operation == "contract-list") {
+            fmt::println("{}", Json::serialize(node->list_contracts()));
+            return 0;
+        }
+        if (options.operation == "toolchain-status") {
+            const auto result = node->toolchain_registry()->manifest();
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            fmt::println("{}", Json::serialize(*result));
+            return 0;
+        }
+        if (options.operation == "toolchain-enable" || options.operation == "toolchain-update") {
+            const auto root =
+                QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
+            ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+            const auto result = installer.install_stable(options.operation == "toolchain-enable");
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            fmt::println("{}", Json::serialize(result->manifest));
+            return 0;
+        }
+        if (options.operation == "contract-build") {
+            QFile source(options.source);
+            if (!source.open(QIODevice::ReadOnly)) {
+                return fail("Cannot read the Rust source file");
+            }
+            const auto root =
+                QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
+            ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+            const auto                                result =
+                installer.build_contract(QString::fromUtf8(source.readAll()), options.project_name);
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            boost::json::object response;
+            response["module"] = result->toStdString();
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        if (options.operation == "token-create") {
+            const auto wallet = node->account_controller()->current_wallet();
+            if (wallet.empty()) {
+                return fail("A current wallet is required");
+            }
+            if (options.token_name.isEmpty() || options.token_ticker.isEmpty() || options.token_supply.isEmpty()
+                || options.token_decimals < 0 || options.token_decimals > 18) {
+                return fail("Token fields are invalid");
+            }
+            const auto result =
+                node->token_manager()->create_token(wallet.id(),
+                                                    options.token_name.toStdString(),
+                                                    options.token_ticker.toUpper().toStdString(),
+                                                    BigNumberFloat(options.token_supply.toStdString()),
+                                                    "#FA5448",
+                                                    {},
+                                                    static_cast<std::uint8_t>(options.token_decimals));
+            if (!result.has_value()) {
+                return fail("Core rejected the token request");
+            }
+            boost::json::object response;
+            response["token_id"] = result->token_id.to_string();
+            response["owner_id"] = result->owner_id.to_string();
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+
+        const auto input = arguments(options.arguments);
+        if (!input.has_value()) {
+            return fail(input.error());
+        }
+        if (options.operation == "contract-deploy") {
+            const auto module = module_bytes(options.module);
+            if (!module.has_value()) {
+                return fail(module.error());
+            }
+            const auto result = node->submit_contract_deploy(options.kind.toStdString(), *module, *input);
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            boost::json::object response;
+            response["contract_id"]      = result->receiver().to_string();
+            response["transaction_hash"] = result->hash();
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        const auto contract_id = ActorId::create(options.contract_id.toStdString());
+        if (!contract_id.has_value()) {
+            return fail("Contract ID is invalid");
+        }
+        if (options.operation == "contract-call") {
+            const auto result = node->submit_contract_call(*contract_id, options.method.toStdString(), *input);
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            boost::json::object response;
+            response["transaction_hash"] = result->hash();
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        if (options.operation == "contract-query") {
+            const auto result = node->query_contract(*contract_id, options.method.toStdString(), *input);
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            boost::json::object response;
+            response["data_base64"] = Utils::to_base64(result->data);
+            if (const auto json = ExtraChain::Contracts::Codec::decode_json(result->data); json.has_value()) {
+                response["data"] = boost::json::parse(*json);
+            }
+            response["state_hash"] = result->state_hash;
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        if (options.operation == "contract-upgrade") {
+            const auto module = module_bytes(options.module);
+            if (!module.has_value()) {
+                return fail(module.error());
+            }
+            const auto result = node->submit_contract_upgrade(*contract_id, *module, *input);
+            if (!result.has_value()) {
+                return fail(result.error().detail);
+            }
+            boost::json::object response;
+            response["transaction_hash"] = result->hash();
+            fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        return fail("Unknown operation");
+    }
+} // namespace
 
 #ifdef Q_OS_WIN
 const char* strsignal(int sig) {
@@ -222,17 +401,31 @@ int main(int argc, char* argv[]) {
     QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
     QCommandLineOption channelsVectorOption("create-channels-vector", "Create channels vector");
     QCommandLineOption tokenAllocationsOption("create-token-allocations",
-                                             "Create token allocations dictionary for minting freeze");
-    QCommandLineOption backfillTokenAllocationsOption("backfill-token-allocations",
-                                                     "Backfill token allocations from chain (April 1 2026 to now)");
+                                              "Create token allocations dictionary for minting freeze");
+    QCommandLineOption
+                       backfillTokenAllocationsOption("backfill-token-allocations",
+                                       "Backfill token allocations from chain (April 1 2026 to now)");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
     QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
-    QCommandLineOption createMintSubsOption("create-mint-subs",
-                                            "Register mint actor in profile and create SubscriptionsPay dictionary");
+    QCommandLineOption
+                       createMintSubsOption("create-mint-subs",
+                             "Register mint actor in profile and create SubscriptionsPay dictionary");
+    QCommandLineOption operationOption("operation", "Run one operation and exit", "operation");
+    QCommandLineOption contractIdOption("contract-id", "Contract ID", "contract-id");
+    QCommandLineOption contractKindOption("contract-kind", "Contract kind", "kind");
+    QCommandLineOption contractMethodOption("contract-method", "Contract method", "method");
+    QCommandLineOption contractArgumentsOption("contract-arguments", "Contract JSON arguments", "json", "{}");
+    QCommandLineOption contractModuleOption("contract-module", "WebAssembly module path", "path");
+    QCommandLineOption tokenNameOption("token-name", "Token name", "name");
+    QCommandLineOption tokenTickerOption("token-ticker", "Token ticker", "ticker");
+    QCommandLineOption tokenSupplyOption("token-supply", "Initial token supply", "amount");
+    QCommandLineOption tokenDecimalsOption("token-decimals", "Token decimal precision", "decimals", "8");
+    QCommandLineOption projectNameOption("project-name", "Rust contract project name", "name");
+    QCommandLineOption sourceOption("source", "Rust contract source file", "path");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -263,8 +456,39 @@ int main(int argc, char* argv[]) {
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
                         apiTokenOption,
-                        createMintSubsOption });
+                        createMintSubsOption,
+                        operationOption,
+                        contractIdOption,
+                        contractKindOption,
+                        contractMethodOption,
+                        contractArgumentsOption,
+                        contractModuleOption,
+                        tokenNameOption,
+                        tokenTickerOption,
+                        tokenSupplyOption,
+                        tokenDecimalsOption,
+                        projectNameOption,
+                        sourceOption });
     parser.process(app);
+
+    bool           decimals_ok = false;
+    OneShotOptions one_shot {
+        .operation      = parser.value(operationOption).trimmed(),
+        .contract_id    = parser.value(contractIdOption).trimmed(),
+        .kind           = parser.value(contractKindOption).trimmed(),
+        .method         = parser.value(contractMethodOption).trimmed(),
+        .arguments      = parser.value(contractArgumentsOption),
+        .module         = parser.value(contractModuleOption),
+        .token_name     = parser.value(tokenNameOption).trimmed(),
+        .token_ticker   = parser.value(tokenTickerOption).trimmed(),
+        .token_supply   = parser.value(tokenSupplyOption).trimmed(),
+        .token_decimals = parser.value(tokenDecimalsOption).toInt(&decimals_ok),
+        .project_name   = parser.value(projectNameOption).trimmed(),
+        .source         = parser.value(sourceOption),
+    };
+    if (!decimals_ok) {
+        one_shot.token_decimals = -1;
+    }
 
     // TODO: allow absolute directory
     QString dirName = Utils::fix_file_name(parser.value(dirOption), "");
@@ -294,7 +518,7 @@ int main(int argc, char* argv[]) {
 
     bool debug_logs = parser.isSet(debugLogsOption);
 #ifdef QT_DEBUG
-    debug_logs = !parser.isSet(debugLogsOption);
+    debug_logs            = !parser.isSet(debugLogsOption);
     Network::networkDebug = parser.isSet(netdebOption);
     eInfo("Debug logs enabled: {}", debug_logs);
 #endif
@@ -387,13 +611,20 @@ int main(int argc, char* argv[]) {
         QString importFile = parser.value(importOption);
         if (!importFile.isEmpty()) {
             QFile file(importFile);
-            file.open(QFile::ReadOnly);
+            if (!file.open(QFile::ReadOnly)) {
+                eInfo("Can't open import file: {}", file.errorString());
+                std::exit(1);
+            }
             auto data = file.readAll().toStdString();
             if (data.empty()) {
                 eInfo("Incorrect import");
-                std::exit(0);
+                std::exit(1);
             }
-            node->import_profile(data, login.toStdString(), password.toStdString());
+            const auto imported = node->import_profile(data, login.toStdString(), password.toStdString());
+            if (!imported.has_value()) {
+                eInfo("Can't import profile: {}", Utils::enum_value_name_value(imported.error()));
+                std::exit(1);
+            }
             file.close();
         }
 
@@ -417,6 +648,12 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        const auto one_shot_exit = run_one_shot(node, one_shot);
+        if (one_shot_exit >= 0) {
+            QCoreApplication::exit(one_shot_exit);
+            return;
+        }
+
         if (parser.isSet(dagGenesisOption)) {
             node->create_new_dag();
         }
@@ -436,7 +673,6 @@ int main(int argc, char* argv[]) {
             } else {
                 eInfo("Can't create tokens cache vector");
             }
-
         }
 
         bool is_username = parser.isSet(usernamesOption);
@@ -569,15 +805,17 @@ int main(int argc, char* argv[]) {
                         eInfo("[create-mint-subs] mint actor {} already in profile", mint_actor.id());
                     }
 
-                    auto sub_search = Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(
-                        node->dfs()->get_db_instance(), mint_actor.id(),
-                        Dfs::Basic::TEMPLATE_DICTIONARY, "SubscriptionsPay");
+                    auto sub_search = Dfs::Tables::DirsFile::ActorSpace::
+                        search_file_by_folder_and_name(node->dfs()->get_db_instance(),
+                                                       mint_actor.id(),
+                                                       Dfs::Basic::TEMPLATE_DICTIONARY,
+                                                       "SubscriptionsPay");
                     if (sub_search.has_value()) {
                         eInfo("[create-mint-subs] SubscriptionsPay dictionary already exists: {}",
                               sub_search->file_id);
                     } else {
-                        auto dict_res = node->dfs()->store_dictionary(mint_actor.id(), mint_actor.id(),
-                                                                      "SubscriptionsPay");
+                        auto dict_res =
+                            node->dfs()->store_dictionary(mint_actor.id(), mint_actor.id(), "SubscriptionsPay");
                         if (!dict_res.has_value()) {
                             eCritical("[create-mint-subs] can't create SubscriptionsPay dictionary: {}",
                                       Utils::enum_value_name_value(dict_res.error()));

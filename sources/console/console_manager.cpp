@@ -132,7 +132,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (sendtx.length() == 3) {
             QByteArray     toId   = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
-            eLog("transaction {} {}", toId, amount.to_string(NumeralBase::Dec));
+            eLog("transaction {} {}", toId, amount.to_string());
 
             ActorId receiver(toId.toStdString());
 
@@ -146,7 +146,10 @@ void ConsoleManager::commandReceiver(QString command) {
             tx.set_receiver(receiver);
             tx.set_amount(amount);
             // createTransaction
-            node->send_transaction(tx, node->account_controller()->system_actor());
+            const auto result = node->send_transaction(tx, node->account_controller()->system_actor());
+            if (!result.has_value()) {
+                eInfo("Transaction failed: {}", Utils::enum_value_name_value(result.error()));
+            }
 
             //            if (mainActorId != firstId)
             //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
@@ -275,12 +278,16 @@ void ConsoleManager::commandReceiver(QString command) {
         auto exported = node->export_profile();
         if (!exported.has_value()) {
             eInfo("Can't export, error: {}", exported.error());
+            return;
         }
         auto    data = QString::fromStdString(exported.value());
         QString fileName =
             QString("%1.extrachain").arg(node->account_controller()->system_actor().id().toQString());
         QFile file(fileName);
-        file.open(QFile::WriteOnly);
+        if (!file.open(QFile::WriteOnly)) {
+            eInfo("Can't open {} for writing: {}", fileName, file.errorString());
+            return;
+        }
         if (file.write(data.toUtf8()) > 1)
             eInfo("Exported to {}", fileName);
         file.close();

@@ -35,7 +35,6 @@ add_executable(extrachain-console
         ${EXTRACHAIN_CONSOLE_SOURCES}
 )
 
-add_compile_definitions(RUN_API="${RUN_API}")
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
 # git
@@ -43,7 +42,11 @@ execute_process(COMMAND git --git-dir ${CMAKE_CURRENT_LIST_DIR}/.git --work-tree
 execute_process(COMMAND git --git-dir ${CMAKE_CURRENT_LIST_DIR}/.git --work-tree $$PWD symbolic-ref --short HEAD OUTPUT_VARIABLE GIT_BRANCH)
 string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
 string(STRIP "${GIT_BRANCH}" GIT_BRANCH)
-add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
+target_compile_definitions(extrachain-console PRIVATE
+        RUN_API="${RUN_API}"
+        GIT_COMMIT="${GIT_COMMIT}"
+        GIT_BRANCH="${GIT_BRANCH}"
+)
 
 target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain Crow::Crow asio::asio)
 
@@ -52,6 +55,7 @@ if(UNIX AND NOT APPLE) # LINUX
 endif()
 
 if(WIN32)
+    target_compile_definitions(extrachain-console PRIVATE _WIN32_WINNT=0x0A00)
     target_link_libraries(extrachain-console PRIVATE dbghelp)
 endif()
 
