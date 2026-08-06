@@ -179,7 +179,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(7) == "connect") {
         auto list = command.split(" ");
-        if (list.length() != 3)
+        if (list.length() != 3 && list.length() != 4)
             return;
 
         QString ip = list[2];
@@ -189,8 +189,24 @@ void ConsoleManager::commandReceiver(QString command) {
 
         if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
-            qInfo().noquote() << "Connect to" << ip << protocol;
-            node->network()->connect_to_node(ip, networkProtocol);
+            if (list.length() == 4) {
+                bool          port_ok = false;
+                const quint16 port    = list[3].toUShort(&port_ok);
+                if (!port_ok || port == 0 || protocol != "ws") {
+                    eInfo("Invalid connect port");
+                    return;
+                }
+                qInfo().noquote() << "Connect to" << ip << protocol << port;
+                QMetaObject::invokeMethod(
+                    node->network(),
+                    [network = node->network(), ip, port]() {
+                        network->connect_to_endpoint(ip, port);
+                    },
+                    Qt::QueuedConnection);
+            } else {
+                qInfo().noquote() << "Connect to" << ip << protocol;
+                node->network()->connect_to_node(ip, networkProtocol);
+            }
         } else {
             eInfo("Invalid connect input");
         }
@@ -280,7 +296,6 @@ void ConsoleManager::commandReceiver(QString command) {
             eInfo("Can't export, error: {}", exported.error());
             return;
         }
-        auto    data = QString::fromStdString(exported.value());
         QString fileName =
             QString("%1.extrachain").arg(node->account_controller()->system_actor().id().toQString());
         QFile file(fileName);
@@ -288,8 +303,11 @@ void ConsoleManager::commandReceiver(QString command) {
             eInfo("Can't open {} for writing: {}", fileName, file.errorString());
             return;
         }
-        if (file.write(data.toUtf8()) > 1)
+        const QByteArray data = QByteArray::fromStdString(*exported);
+        if (file.write(data) == data.size())
             eInfo("Exported to {}", fileName);
+        else
+            eInfo("Can't write complete profile export to {}: {}", fileName, file.errorString());
         file.close();
     }
 

@@ -48,7 +48,7 @@ target_compile_definitions(extrachain-console PRIVATE
         GIT_BRANCH="${GIT_BRANCH}"
 )
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain Crow::Crow asio::asio)
+target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network Qt6::WebSockets extrachain Crow::Crow asio::asio)
 
 if(UNIX AND NOT APPLE) # LINUX
     target_link_libraries(extrachain-console PRIVATE stdc++exp backtrace)
@@ -57,6 +57,18 @@ endif()
 if(WIN32)
     target_compile_definitions(extrachain-console PRIVATE _WIN32_WINNT=0x0A00)
     target_link_libraries(extrachain-console PRIVATE dbghelp)
+
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BINARY_DIRECTORY "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${QT_BINARY_DIRECTORY}" REQUIRED)
+    add_custom_command(TARGET extrachain-console POST_BUILD
+        COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+            --no-compiler-runtime
+            --no-translations
+            "$<TARGET_FILE:extrachain-console>"
+        COMMENT "Deploying the Qt runtime"
+        VERBATIM
+    )
 endif()
 
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)

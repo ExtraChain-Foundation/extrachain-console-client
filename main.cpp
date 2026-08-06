@@ -411,6 +411,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
+    QCommandLineOption networkPortOption("network-port", "WebSocket listen port", "port", "17593");
     QCommandLineOption
                        createMintSubsOption("create-mint-subs",
                              "Register mint actor in profile and create SubscriptionsPay dictionary");
@@ -456,6 +457,7 @@ int main(int argc, char* argv[]) {
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
                         apiTokenOption,
+                        networkPortOption,
                         createMintSubsOption,
                         operationOption,
                         contractIdOption,
@@ -562,7 +564,14 @@ int main(int argc, char* argv[]) {
     else
         console.startInput();
 
-    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, 17593);
+    bool          network_port_ok = false;
+    const quint16 network_port    = parser.value(networkPortOption).toUShort(&network_port_ok);
+    if (!network_port_ok || network_port == 0) {
+        eCritical("Invalid --network-port value");
+        return EXIT_FAILURE;
+    }
+
+    ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, network_port);
     auto                   node         = node_wrapper->node;
     node_wrapper->init(true);
 
@@ -610,22 +619,12 @@ int main(int argc, char* argv[]) {
 
         QString importFile = parser.value(importOption);
         if (!importFile.isEmpty()) {
-            QFile file(importFile);
-            if (!file.open(QFile::ReadOnly)) {
-                eInfo("Can't open import file: {}", file.errorString());
-                std::exit(1);
-            }
-            auto data = file.readAll().toStdString();
-            if (data.empty()) {
-                eInfo("Incorrect import");
-                std::exit(1);
-            }
-            const auto imported = node->import_profile(data, login.toStdString(), password.toStdString());
+            const auto imported =
+                node->import_profile_file(importFile.toStdString(), login.toStdString(), password.toStdString());
             if (!imported.has_value()) {
                 eInfo("Can't import profile: {}", Utils::enum_value_name_value(imported.error()));
                 std::exit(1);
             }
-            file.close();
         }
 
         if (node->account_controller()->count() == 0) {
