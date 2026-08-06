@@ -26,6 +26,7 @@
 #include <QFile>
 
 #include "managers/extrachain_node.h"
+#include "contracts/contract_manager.h"
 #include "chain/dag.h"
 #include "dfs/dfs_controller.h"
 #include "utils/exc_utils.h"
@@ -132,6 +133,141 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         if (token != token_session) return json_error(400, "token is not valid");
         return std::nullopt;
     };
+
+    CROW_ROUTE(app, "/contract/deploy").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json)
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        if (!json.has("kind") || !json.has("module_base64")) {
+            return json_error(400, "kind and module_base64 required");
+        }
+        auto module    = Utils::from_base64<std::vector<std::uint8_t>>(std::string(json["module_base64"].s()));
+        auto arguments = Utils::from_base64<std::vector<std::uint8_t>>(
+            json.has("arguments_base64") ? std::string(json["arguments_base64"].s()) : std::string());
+        if (!module.has_value() || module->empty() || !arguments.has_value()) {
+            return json_error(400, "invalid module or arguments");
+        }
+        auto transaction = node->submit_contract_deploy(std::string(json["kind"].s()), *module, *arguments);
+        if (!transaction.has_value())
+            return json_error(409, transaction.error().detail);
+
+        crow::json::wvalue response;
+        response["contract_id"]      = transaction->receiver().to_string();
+        response["transaction_hash"] = transaction->hash();
+        response["section"]          = transaction->section().to_string(NumeralBase::Dec);
+        return crow::response(202, response);
+    });
+
+    CROW_ROUTE(app, "/contract/call").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json)
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        if (!json.has("contract_id") || !json.has("method")) {
+            return json_error(400, "contract_id and method required");
+        }
+        auto contract_id = ActorId::create(std::string(json["contract_id"].s()));
+        if (!contract_id.has_value())
+            return json_error(400, "invalid contract_id");
+        auto arguments = Utils::from_base64<std::vector<std::uint8_t>>(
+            json.has("arguments_base64") ? std::string(json["arguments_base64"].s()) : std::string());
+        if (!arguments.has_value())
+            return json_error(400, "invalid arguments_base64");
+        auto transaction = node->submit_contract_call(*contract_id, std::string(json["method"].s()), *arguments);
+        if (!transaction.has_value())
+            return json_error(409, transaction.error().detail);
+
+        crow::json::wvalue response;
+        response["transaction_hash"] = transaction->hash();
+        response["section"]          = transaction->section().to_string(NumeralBase::Dec);
+        return crow::response(202, response);
+    });
+
+    CROW_ROUTE(app, "/contract/query").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json)
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        if (!json.has("contract_id") || !json.has("method")) {
+            return json_error(400, "contract_id and method required");
+        }
+        auto contract_id = ActorId::create(std::string(json["contract_id"].s()));
+        if (!contract_id.has_value())
+            return json_error(400, "invalid contract_id");
+        auto arguments = Utils::from_base64<std::vector<std::uint8_t>>(
+            json.has("arguments_base64") ? std::string(json["arguments_base64"].s()) : std::string());
+        if (!arguments.has_value())
+            return json_error(400, "invalid arguments_base64");
+        auto receipt = node->query_contract(*contract_id, std::string(json["method"].s()), *arguments);
+        if (!receipt.has_value())
+            return json_error(409, receipt.error().detail);
+
+        crow::json::wvalue response;
+        response["data_base64"] = Utils::to_base64(receipt->data);
+        response["state_hash"]  = receipt->state_hash;
+        response["version"]     = receipt->version;
+        response["revision"]    = receipt->revision;
+        return crow::response(200, response);
+    });
+
+    CROW_ROUTE(app, "/contract/inspect").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        auto contract_id_raw = req.url_params.get("contract_id");
+        if (!contract_id_raw)
+            return json_error(400, "contract_id required");
+        auto contract_id = ActorId::create(std::string(contract_id_raw));
+        if (!contract_id.has_value())
+            return json_error(400, "invalid contract_id");
+        auto record = node->contract_manager()->inspect(contract_id->to_string());
+        if (!record.has_value())
+            return json_error(404, record.error().detail);
+        const auto& version  = record->versions.at(record->active_version - 1);
+        const auto& revision = version.revisions.back();
+
+        crow::json::wvalue response;
+        response["contract_id"]      = record->contract_id;
+        response["owner_id"]         = record->owner_id;
+        response["kind"]             = record->kind;
+        response["version"]          = version.version;
+        response["revision"]         = revision.revision;
+        response["module_hash"]      = version.module_hash;
+        response["state_hash"]       = revision.state_hash;
+        response["transaction_hash"] = revision.transaction_hash;
+        return crow::response(200, response);
+    });
+
+    CROW_ROUTE(app, "/contract/upgrade").methods("POST"_method)([&](const crow::request& req) {
+        auto json = crow::json::load(req.body);
+        if (!json)
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        if (!json.has("contract_id") || !json.has("module_base64")) {
+            return json_error(400, "contract_id and module_base64 required");
+        }
+        auto contract_id = ActorId::create(std::string(json["contract_id"].s()));
+        if (!contract_id.has_value())
+            return json_error(400, "invalid contract_id");
+        auto module    = Utils::from_base64<std::vector<std::uint8_t>>(std::string(json["module_base64"].s()));
+        auto arguments = Utils::from_base64<std::vector<std::uint8_t>>(
+            json.has("arguments_base64") ? std::string(json["arguments_base64"].s()) : std::string());
+        if (!module.has_value() || module->empty() || !arguments.has_value()) {
+            return json_error(400, "invalid module or arguments");
+        }
+        auto transaction = node->submit_contract_upgrade(*contract_id, *module, *arguments);
+        if (!transaction.has_value())
+            return json_error(409, transaction.error().detail);
+
+        crow::json::wvalue response;
+        response["transaction_hash"] = transaction->hash();
+        response["section"]          = transaction->section().to_string(NumeralBase::Dec);
+        return crow::response(202, response);
+    });
 
     CROW_ROUTE(app, "/balance").methods("POST"_method)([&](const crow::request& req) {
         auto json = crow::json::load(req.body);

@@ -5,6 +5,16 @@ REST API for interacting with the ExtraChain node.
 **Base URL:** `http://<host>:17581`  
 **Authentication:** All endpoints require an `token` parameter (POST body or query string).
 
+Contract endpoints use MessagePack arguments encoded as URL-safe Base64. State-changing calls return `202` with a transaction hash. Read-only queries return the contract result without creating a transaction.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/contract/deploy` | Deploy a WebAssembly contract |
+| `POST` | `/contract/call` | Submit a state-changing contract method |
+| `POST` | `/contract/query` | Run a read-only contract method |
+| `GET` | `/contract/inspect` | Read the active version and state hashes |
+| `POST` | `/contract/upgrade` | Submit an owner-approved immutable module upgrade |
+
 To start the API, pass `--api-token` on launch:
 ```bash
 ./extrachain-console --api-token <your_token>
