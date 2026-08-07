@@ -471,14 +471,19 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         const auto& revision = version.revisions.back();
 
         crow::json::wvalue response;
-        response["contract_id"]      = record->contract_id;
-        response["owner_id"]         = record->owner_id;
-        response["kind"]             = record->kind;
-        response["version"]          = version.version;
-        response["revision"]         = revision.revision;
-        response["module_hash"]      = version.module_hash;
-        response["state_hash"]       = revision.state_hash;
-        response["transaction_hash"] = revision.transaction_hash;
+        response["contract_id"]                 = record->contract_id;
+        response["owner_id"]                    = record->owner_id;
+        response["kind"]                        = record->kind;
+        response["version"]                     = version.version;
+        response["revision"]                    = revision.revision;
+        response["module_hash"]                 = version.module_hash;
+        response["state_hash"]                  = revision.state_hash;
+        response["transaction_hash"]            = revision.transaction_hash;
+        response["checkpoint_revision"]         = revision.checkpoint_revision;
+        response["checkpoint_section"]          = revision.checkpoint_block;
+        response["checkpoint_state_hash"]       = revision.checkpoint_hash;
+        response["checkpoint_transaction_hash"] = revision.checkpoint_transaction_hash;
+        response["replay_depth"]                = revision.revision - revision.checkpoint_revision;
         return crow::response(200, response);
     });
 
