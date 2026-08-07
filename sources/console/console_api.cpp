@@ -81,6 +81,71 @@ namespace {
         return std::nullopt;
     }
 
+    std::expected<ExtraChain::Contracts::VerifiedInputs, std::string> contract_verified_inputs(
+        const boost::json::object& json) {
+        ExtraChain::Contracts::VerifiedInputs result;
+        const auto unsigned_value = [](const boost::json::value* value) -> std::optional<std::uint64_t> {
+            if (value == nullptr)
+                return std::nullopt;
+            if (value->is_uint64())
+                return value->as_uint64();
+            if (value->is_int64() && value->as_int64() >= 0)
+                return static_cast<std::uint64_t>(value->as_int64());
+            return std::nullopt;
+        };
+        const auto* dag = json.if_contains("dag_proofs");
+        if (dag != nullptr) {
+            if (!dag->is_array())
+                return std::unexpected("dag_proofs must be an array");
+            if (dag->as_array().size() > ExtraChain::Contracts::ContractMaximumProofs)
+                return std::unexpected("too many contract proofs");
+            for (const auto& value : dag->as_array()) {
+                if (!value.is_object())
+                    return std::unexpected("each DAG proof must be an object");
+                const auto& proof         = value.as_object();
+                const auto* hash          = proof.if_contains("transaction_hash");
+                const auto* section       = proof.if_contains("section");
+                const auto* confirmations = proof.if_contains("minimum_confirmations");
+                const auto section_value = unsigned_value(section);
+                const auto confirmation_value = confirmations == nullptr
+                                                    ? std::optional<std::uint64_t>(1)
+                                                    : unsigned_value(confirmations);
+                if (hash == nullptr || !hash->is_string() || !section_value.has_value()
+                    || !confirmation_value.has_value())
+                    return std::unexpected("a DAG proof has invalid fields");
+                result.dag.push_back(ExtraChain::Contracts::DagProof {
+                    .transaction_hash = std::string(hash->as_string()),
+                    .section          = *section_value,
+                    .confirmations    = *confirmation_value,
+                });
+            }
+        }
+        const auto* dfs = json.if_contains("dfs_proofs");
+        if (dfs != nullptr) {
+            if (!dfs->is_array())
+                return std::unexpected("dfs_proofs must be an array");
+            if (result.dag.size() + dfs->as_array().size() > ExtraChain::Contracts::ContractMaximumProofs)
+                return std::unexpected("too many contract proofs");
+            for (const auto& value : dfs->as_array()) {
+                if (!value.is_object())
+                    return std::unexpected("each DFS proof must be an object");
+                const auto& proof   = value.as_object();
+                const auto* owner   = proof.if_contains("owner_id");
+                const auto* file    = proof.if_contains("file_id");
+                const auto* hash    = proof.if_contains("content_hash");
+                if (owner == nullptr || !owner->is_string() || file == nullptr || !file->is_string()
+                    || (hash != nullptr && !hash->is_string()))
+                    return std::unexpected("a DFS proof has invalid fields");
+                result.dfs.push_back(ExtraChain::Contracts::DfsProof {
+                    .file_id      = std::string(file->as_string()),
+                    .owner_id     = std::string(owner->as_string()),
+                    .content_hash = hash == nullptr ? std::string() : std::string(hash->as_string()),
+                });
+            }
+        }
+        return result;
+    }
+
     std::string subscription_to_json(const SubscriptionRecord& rec) {
         return Json::serialize(rec);
     }
@@ -314,6 +379,54 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         return response;
     });
 
+    CROW_ROUTE(app, "/contract/components").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        const auto root =
+            QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
+        const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        const auto components = installer.component_catalog();
+        if (components.empty())
+            return json_error(409, "contract toolchain is not installed or its catalog is invalid");
+        auto response = crow::response(200, Json::serialize(components));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
+    CROW_ROUTE(app, "/contract/compose").methods("POST"_method)([&](const crow::request& req) {
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        const auto* project_name = object->if_contains("project_name");
+        const auto* components   = object->if_contains("components");
+        if (project_name == nullptr || !project_name->is_string() || components == nullptr
+            || !components->is_array() || components->as_array().empty())
+            return json_error(400, "project_name and components required");
+        std::vector<std::string> selected;
+        selected.reserve(components->as_array().size());
+        for (const auto& component : components->as_array()) {
+            if (!component.is_string() || component.as_string().empty())
+                return json_error(400, "each component must be a non-empty string");
+            selected.emplace_back(component.as_string());
+        }
+        const auto root =
+            QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
+        const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        const auto result = installer.compose_contract(
+            selected,
+            QString::fromStdString(std::string(project_name->as_string())));
+        if (!result.has_value())
+            return json_error(409, result.error().detail);
+        boost::json::object body;
+        body["source"] = result->toStdString();
+        auto response  = crow::response(200, boost::json::serialize(body));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
     CROW_ROUTE(app, "/toolchain/publish-package").methods("POST"_method)([&](const crow::request& req) {
         auto json   = crow::json::load(req.body);
         auto object = request_object(req);
@@ -411,7 +524,11 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         auto arguments = contract_arguments(*object);
         if (!arguments.has_value())
             return json_error(400, arguments.error());
-        auto transaction = node->submit_contract_call(*contract_id, std::string(json["method"].s()), *arguments);
+        auto verified = contract_verified_inputs(*object);
+        if (!verified.has_value())
+            return json_error(400, verified.error());
+        auto transaction = node->submit_contract_call(
+            *contract_id, std::string(json["method"].s()), *arguments, *verified);
         if (!transaction.has_value())
             return json_error(409, transaction.error().detail);
 
