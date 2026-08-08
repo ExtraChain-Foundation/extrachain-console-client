@@ -132,7 +132,7 @@ void ConsoleManager::commandReceiver(QString command) {
         if (sendtx.length() == 3) {
             QByteArray     toId   = sendtx[1].toUtf8();
             BigNumberFloat amount = BigNumberFloat(sendtx[2].toStdString());
-            eLog("transaction {} {}", toId, amount.to_string(NumeralBase::Dec));
+            eLog("transaction {} {}", toId, amount.to_string());
 
             ActorId receiver(toId.toStdString());
 
@@ -146,7 +146,10 @@ void ConsoleManager::commandReceiver(QString command) {
             tx.set_receiver(receiver);
             tx.set_amount(amount);
             // createTransaction
-            node->send_transaction(tx, node->account_controller()->system_actor());
+            const auto result = node->send_transaction(tx, node->account_controller()->system_actor());
+            if (!result.has_value()) {
+                eInfo("Transaction failed: {}", Utils::enum_value_name_value(result.error()));
+            }
 
             //            if (mainActorId != firstId)
             //            node->createTransaction(receiver, BigNumberFloat(10), ActorId());
@@ -176,7 +179,7 @@ void ConsoleManager::commandReceiver(QString command) {
 
     if (command.left(7) == "connect") {
         auto list = command.split(" ");
-        if (list.length() != 3)
+        if (list.length() != 3 && list.length() != 4)
             return;
 
         QString ip = list[2];
@@ -186,8 +189,24 @@ void ConsoleManager::commandReceiver(QString command) {
 
         if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
-            qInfo().noquote() << "Connect to" << ip << protocol;
-            node->network()->connect_to_node(ip, networkProtocol);
+            if (list.length() == 4) {
+                bool          port_ok = false;
+                const quint16 port    = list[3].toUShort(&port_ok);
+                if (!port_ok || port == 0 || protocol != "ws") {
+                    eInfo("Invalid connect port");
+                    return;
+                }
+                qInfo().noquote() << "Connect to" << ip << protocol << port;
+                QMetaObject::invokeMethod(
+                    node->network(),
+                    [network = node->network(), ip, port]() {
+                        network->connect_to_endpoint(ip, port);
+                    },
+                    Qt::QueuedConnection);
+            } else {
+                qInfo().noquote() << "Connect to" << ip << protocol;
+                node->network()->connect_to_node(ip, networkProtocol);
+            }
         } else {
             eInfo("Invalid connect input");
         }
@@ -275,14 +294,20 @@ void ConsoleManager::commandReceiver(QString command) {
         auto exported = node->export_profile();
         if (!exported.has_value()) {
             eInfo("Can't export, error: {}", exported.error());
+            return;
         }
-        auto    data = QString::fromStdString(exported.value());
         QString fileName =
             QString("%1.extrachain").arg(node->account_controller()->system_actor().id().toQString());
         QFile file(fileName);
-        file.open(QFile::WriteOnly);
-        if (file.write(data.toUtf8()) > 1)
+        if (!file.open(QFile::WriteOnly)) {
+            eInfo("Can't open {} for writing: {}", fileName, file.errorString());
+            return;
+        }
+        const QByteArray data = QByteArray::fromStdString(*exported);
+        if (file.write(data) == data.size())
             eInfo("Exported to {}", fileName);
+        else
+            eInfo("Can't write complete profile export to {}: {}", fileName, file.errorString());
         file.close();
     }
 

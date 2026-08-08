@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 project(extrachain-console LANGUAGES C CXX VERSION 1.0)
 
 set(EXTRACHAIN_STATIC_BUILD true)
-include(../extrachain-core/CMakeLists.txt)
+set(EXTRACHAIN_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../extrachain-core" CACHE PATH "ExtraChain Core source directory")
+include(${EXTRACHAIN_CORE_DIR}/CMakeLists.txt)
 set(RUN_API TRUE)
 
 # include(FetchContent)
@@ -35,7 +36,6 @@ add_executable(extrachain-console
         ${EXTRACHAIN_CONSOLE_SOURCES}
 )
 
-add_compile_definitions(RUN_API="${RUN_API}")
 target_include_directories(extrachain-console PUBLIC ${CMAKE_CURRENT_LIST_DIR}/headers ${EXTRACHAIN_CORE_INCLUDES})
 
 # git
@@ -43,16 +43,33 @@ execute_process(COMMAND git --git-dir ${CMAKE_CURRENT_LIST_DIR}/.git --work-tree
 execute_process(COMMAND git --git-dir ${CMAKE_CURRENT_LIST_DIR}/.git --work-tree $$PWD symbolic-ref --short HEAD OUTPUT_VARIABLE GIT_BRANCH)
 string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
 string(STRIP "${GIT_BRANCH}" GIT_BRANCH)
-add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
+target_compile_definitions(extrachain-console PRIVATE
+        RUN_API="${RUN_API}"
+        GIT_COMMIT="${GIT_COMMIT}"
+        GIT_BRANCH="${GIT_BRANCH}"
+)
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain Crow::Crow asio::asio)
+target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network Qt6::WebSockets extrachain Crow::Crow asio::asio)
 
 if(UNIX AND NOT APPLE) # LINUX
     target_link_libraries(extrachain-console PRIVATE stdc++exp backtrace)
 endif()
 
 if(WIN32)
+    target_compile_definitions(extrachain-console PRIVATE _WIN32_WINNT=0x0A00)
     target_link_libraries(extrachain-console PRIVATE dbghelp)
+
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BINARY_DIRECTORY "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${QT_BINARY_DIRECTORY}" REQUIRED)
+    add_custom_command(TARGET extrachain-console POST_BUILD
+        COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+            --no-compiler-runtime
+            --no-translations
+            "$<TARGET_FILE:extrachain-console>"
+        COMMENT "Deploying the Qt runtime"
+        VERBATIM
+    )
 endif()
 
 set_property(TARGET extrachain-console PROPERTY POSITION_INDEPENDENT_CODE 1)
