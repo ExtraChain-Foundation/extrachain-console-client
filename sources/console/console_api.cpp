@@ -106,10 +106,9 @@ namespace {
                 const auto* hash          = proof.if_contains("transaction_hash");
                 const auto* section       = proof.if_contains("section");
                 const auto* confirmations = proof.if_contains("minimum_confirmations");
-                const auto section_value = unsigned_value(section);
-                const auto confirmation_value = confirmations == nullptr
-                                                    ? std::optional<std::uint64_t>(1)
-                                                    : unsigned_value(confirmations);
+                const auto  section_value = unsigned_value(section);
+                const auto  confirmation_value =
+                    confirmations == nullptr ? std::optional<std::uint64_t>(1) : unsigned_value(confirmations);
                 if (hash == nullptr || !hash->is_string() || !section_value.has_value()
                     || !confirmation_value.has_value())
                     return std::unexpected("a DAG proof has invalid fields");
@@ -129,10 +128,10 @@ namespace {
             for (const auto& value : dfs->as_array()) {
                 if (!value.is_object())
                     return std::unexpected("each DFS proof must be an object");
-                const auto& proof   = value.as_object();
-                const auto* owner   = proof.if_contains("owner_id");
-                const auto* file    = proof.if_contains("file_id");
-                const auto* hash    = proof.if_contains("content_hash");
+                const auto& proof = value.as_object();
+                const auto* owner = proof.if_contains("owner_id");
+                const auto* file  = proof.if_contains("file_id");
+                const auto* hash  = proof.if_contains("content_hash");
                 if (owner == nullptr || !owner->is_string() || file == nullptr || !file->is_string()
                     || (hash != nullptr && !hash->is_string()))
                     return std::unexpected("a DFS proof has invalid fields");
@@ -203,7 +202,7 @@ long long parseTimeToMs(const std::string& time_str) {
     return totalMs > 0 ? totalMs : 24 * 60 * 60 * 1000;
 }
 
-void run_api(ExtraChainNode* node, const std::string& api_token) {
+void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t port) {
     crow::SimpleApp app;
     std::string     token_session = api_token;
     eLog("API runned.");
@@ -247,6 +246,19 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             return json_error(400, "token is not valid");
         return std::nullopt;
     };
+
+    CROW_ROUTE(app, "/profile/current").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        const auto wallet = node->account_controller()->current_wallet();
+        if (wallet.empty())
+            return json_error(409, "current wallet is not available");
+        crow::json::wvalue response;
+        response["wallet_id"]  = wallet.id().to_string();
+        response["system_id"]  = node->account_controller()->system_actor().id().to_string();
+        response["network_id"] = node->network_id().to_string();
+        return crow::response(200, response);
+    });
 
     CROW_ROUTE(app, "/contract/list").methods("GET"_method)([&](const crow::request& req) {
         if (auto err = check_token_get(req))
@@ -322,6 +334,43 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         return crow::response(202, response);
     });
 
+    CROW_ROUTE(app, "/token/legacy").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        auto response = crow::response(200, Json::serialize(node->token_manager()->legacy_tokens()));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
+    CROW_ROUTE(app, "/token/list").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        auto response = crow::response(200, Json::serialize(node->token_manager()->list_tokens()));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
+    CROW_ROUTE(app, "/token/migrate").methods("POST"_method)([&](const crow::request& req) {
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        const auto* value = object->if_contains("token_id");
+        if (value == nullptr || !value->is_string())
+            return json_error(400, "token_id required");
+        auto token_id = TokenId::create(std::string(value->as_string()));
+        if (!token_id.has_value() || token_id->is_zero())
+            return json_error(400, "invalid token_id");
+        auto migrated = node->token_manager()->migrate_legacy_token(*token_id);
+        if (!migrated.has_value())
+            return json_error(409, "token migration was rejected");
+        auto response = crow::response(202, Json::serialize(migrated.value()));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
     CROW_ROUTE(app, "/toolchain/status").methods("GET"_method)([&](const crow::request& req) {
         if (auto err = check_token_get(req))
             return std::move(*err);
@@ -385,7 +434,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
         const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
-        const auto components = installer.component_catalog();
+        const auto                                      components = installer.component_catalog();
         if (components.empty())
             return json_error(409, "contract toolchain is not installed or its catalog is invalid");
         auto response = crow::response(200, Json::serialize(components));
@@ -415,9 +464,8 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
         const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
-        const auto result = installer.compose_contract(
-            selected,
-            QString::fromStdString(std::string(project_name->as_string())));
+        const auto                                      result =
+            installer.compose_contract(selected, QString::fromStdString(std::string(project_name->as_string())));
         if (!result.has_value())
             return json_error(409, result.error().detail);
         boost::json::object body;
@@ -527,8 +575,8 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         auto verified = contract_verified_inputs(*object);
         if (!verified.has_value())
             return json_error(400, verified.error());
-        auto transaction = node->submit_contract_call(
-            *contract_id, std::string(json["method"].s()), *arguments, *verified);
+        auto transaction =
+            node->submit_contract_call(*contract_id, std::string(json["method"].s()), *arguments, *verified);
         if (!transaction.has_value())
             return json_error(409, transaction.error().detail);
 
@@ -632,9 +680,58 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         return crow::response(202, response);
     });
 
+    CROW_ROUTE(app, "/transaction/send").methods("POST"_method)([&](const crow::request& req) {
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        const auto* receiver_value = object->if_contains("receiver");
+        const auto* amount_value   = object->if_contains("amount");
+        if (receiver_value == nullptr || !receiver_value->is_string() || amount_value == nullptr
+            || !amount_value->is_string()) {
+            return json_error(400, "receiver and amount required");
+        }
+        auto receiver = ActorId::create(std::string(receiver_value->as_string()));
+        auto amount   = BigNumberFloat::create(std::string(amount_value->as_string()));
+        if (!receiver.has_value() || receiver.value().is_zero() || !amount.has_value() || amount.value() <= 0)
+            return json_error(400, "invalid receiver or amount");
+
+        TokenId token_id;
+        if (const auto* token_value = object->if_contains("token_id"); token_value != nullptr) {
+            if (!token_value->is_string())
+                return json_error(400, "invalid token_id");
+            const auto token_id_text = std::string(token_value->as_string());
+            if (!token_id_text.empty()) {
+                auto parsed = TokenId::create(token_id_text);
+                if (!parsed.has_value())
+                    return json_error(400, "invalid token_id");
+                token_id = parsed.value();
+            }
+        }
+        const auto contract_token = node->token_manager()->is_contract_token(token_id);
+        auto       transaction    = node->create_transaction(receiver.value(), amount.value(), token_id);
+        if (!transaction.has_value())
+            return json_error(409, "transaction was rejected");
+        if (!contract_token) {
+            auto sent = node->send_transaction(transaction.value(), node->account_controller()->current_wallet());
+            if (!sent.has_value())
+                return json_error(409, "transaction was not submitted");
+            transaction = std::move(sent);
+        }
+        crow::json::wvalue response;
+        response["hash"]     = transaction.value().hash();
+        response["receiver"] = transaction.value().receiver().to_string();
+        response["token_id"] = token_id.to_string();
+        response["type"]     = Utils::enum_value_name_value(transaction.value().type());
+        return crow::response(202, response);
+    });
+
     CROW_ROUTE(app, "/balance").methods("POST"_method)([&](const crow::request& req) {
-        auto json = crow::json::load(req.body);
-        if (!json)
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
             return json_error(400, "invalid json");
         if (auto err = check_token_post(json))
             return std::move(*err);
@@ -646,7 +743,23 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         if (!actor_id.has_value())
             return json_error(400, "invalid actor_id");
 
-        TokenId tokenId("468faf2f1be6504a9a26f7f027f7e43380b0d77d");
+        TokenId token_id;
+        if (const auto* token_value = object->if_contains("token_id"); token_value != nullptr) {
+            if (!token_value->is_string())
+                return json_error(400, "invalid token_id");
+            const auto token_id_text = std::string(token_value->as_string());
+            if (!token_id_text.empty()) {
+                auto parsed = TokenId::create(token_id_text);
+                if (!parsed.has_value())
+                    return json_error(400, "invalid token_id");
+                token_id = parsed.value();
+            }
+        } else {
+            auto rocc = TokenId::create("468faf2f1be6504a9a26f7f027f7e43380b0d77d");
+            if (!rocc.has_value())
+                return json_error(500, "ROCC token identifier is invalid");
+            token_id = rocc.value();
+        }
 
         if (!node->actor_index()->exists(actor_id.value()))
             return json_error(404, "actor not found");
@@ -657,7 +770,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
             node->dag()->calculate_actors_balance({ actor_id.value() });
 
         BigNumberFloat balance    = BigNumberFloat(0);
-        auto           balanceKey = std::make_pair(actor_id.value(), tokenId);
+        auto           balanceKey = std::make_pair(actor_id.value(), token_id);
         auto           it         = balances.find(balanceKey);
         if (it != balances.end()) {
             balance = it->second;
@@ -666,6 +779,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         crow::json::wvalue response;
         response["actor_id"] = actor_id.value().to_string();
         response["balance"]  = balance.to_string();
+        response["token_id"] = token_id.to_string();
         return crow::response(200, response);
     });
 
@@ -1172,7 +1286,6 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
         }
     });
 
-    std::uint16_t port = 17581;
     app.bindaddr("0.0.0.0").port(port).concurrency(2).run();
     eLog("Started api on port {}", port);
 }

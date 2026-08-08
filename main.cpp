@@ -33,6 +33,7 @@
 #include "extrachain_version.h"
 #include "managers/token_manager.h"
 #include "managers/thoth_manager.h"
+#include "network/network_manager.h"
 #include "utils/exc_utils.h"
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
@@ -385,6 +386,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption passOption("password", "Set password", "password");
     QCommandLineOption inputOption("disable-input", "Console input disable");
     QCommandLineOption core("core", "First network creation");
+    QCommandLineOption joinOption("join", "Create a local user profile and join an existing network");
     QCommandLineOption dagGenesisOption("dag-genesis", "First dag creation");
     QCommandLineOption importOption("import", "Import from file", "import");
     QCommandLineOption netdebOption("network-debug", "Print all messages. Only for debug build");
@@ -411,7 +413,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
     QCommandLineOption apiTokenOption("api-token", "API token (required to start REST API)", "api-token");
+    QCommandLineOption apiPortOption("api-port", "REST API listen port", "port", "17581");
     QCommandLineOption networkPortOption("network-port", "WebSocket listen port", "port", "17593");
+    QCommandLineOption peerOption("peer", "Connect to a WebSocket peer as host:port", "host:port");
     QCommandLineOption
                        createMintSubsOption("create-mint-subs",
                              "Register mint actor in profile and create SubscriptionsPay dictionary");
@@ -434,6 +438,7 @@ int main(int argc, char* argv[]) {
                         passOption,
                         inputOption,
                         core,
+                        joinOption,
                         dagGenesisOption,
                         clearDataOption,
                         importOption,
@@ -457,7 +462,9 @@ int main(int argc, char* argv[]) {
                         tokenAllocationsOption,
                         backfillTokenAllocationsOption,
                         apiTokenOption,
+                        apiPortOption,
                         networkPortOption,
+                        peerOption,
                         createMintSubsOption,
                         operationOption,
                         contractIdOption,
@@ -570,6 +577,12 @@ int main(int argc, char* argv[]) {
         eCritical("Invalid --network-port value");
         return EXIT_FAILURE;
     }
+    bool          api_port_ok = false;
+    const quint16 api_port    = parser.value(apiPortOption).toUShort(&api_port_ok);
+    if (!api_port_ok || api_port == 0) {
+        eCritical("Invalid --api-port value");
+        return EXIT_FAILURE;
+    }
 
     ExtraChainNodeWrapper* node_wrapper = new ExtraChainNodeWrapper(&app, false, false, network_port);
     auto                   node         = node_wrapper->node;
@@ -627,7 +640,10 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        if (node->account_controller()->count() == 0) {
+        if (parser.isSet(joinOption) && AccountController::profiles_list().empty()) {
+            const auto login_hash = Utils::calculate_hash((login + password).toStdString());
+            node->account_controller()->create_profile(login_hash, ActorType::User);
+        } else if (node->account_controller()->count() == 0) {
             std::string   loginHash;
             AutologinHash autologinHash;
             if (AutologinHash::is_available() && autologinHash.load()) {
@@ -696,21 +712,11 @@ int main(int argc, char* argv[]) {
 
         bool is_thoth = parser.isSet(thothOption);
         if (is_thoth || is_new_network) {
-            auto res = node->thoth_manager()->create_thoth_template();
+            auto res = node->thoth_manager()->create_thoth_dictionary();
             if (!res) {
-                eInfo("Can't create Thoth vector template");
+                eInfo("Can't create Thoth dictionary");
             } else {
-                eSuccess("Thoth vector template created");
-            }
-        }
-
-        bool is_thoth_vector = parser.isSet(thothOption);
-        if (is_thoth_vector || is_new_network) {
-            auto res = node->thoth_manager()->create_thoth_vector();
-            if (!res) {
-                eInfo("Can't create Thoth vector template");
-            } else {
-                eSuccess("Thoth vector created");
+                eSuccess("Thoth dictionary created");
             }
         }
 
@@ -783,7 +789,7 @@ int main(int argc, char* argv[]) {
             eSuccess("Token allocations backfill started in background");
         }
 
-        if (parser.isSet(createMintSubsOption) || is_new_network) {
+        if (parser.isSet(createMintSubsOption)) {
             QFile mint_file("minting_actor.json");
             if (!mint_file.open(QIODevice::ReadOnly)) {
                 eCritical("[create-mint-subs] failed to open minting_actor.json");
@@ -919,11 +925,27 @@ int main(int argc, char* argv[]) {
 
         QString api_token = parser.value(apiTokenOption);
         if (RUN_API && !api_token.isEmpty()) {
-            std::thread([node, token = api_token.toStdString()]() {
-                run_api(node, token);
+            std::thread([node, token = api_token.toStdString(), api_port]() {
+                run_api(node, token, api_port);
             }).detach();
         } else if (RUN_API) {
             eLog("[API] Not started: --api-token not provided");
+        }
+
+        for (const auto& endpoint : parser.values(peerOption)) {
+            const auto separator = endpoint.lastIndexOf(':');
+            if (separator <= 0) {
+                eWarning("[Console] Ignore invalid peer endpoint {}", endpoint.toStdString());
+                continue;
+            }
+            bool       port_ok = false;
+            const auto port    = endpoint.sliced(separator + 1).toUShort(&port_ok);
+            const auto host    = endpoint.first(separator).trimmed();
+            if (host.isEmpty() || !port_ok || port == 0) {
+                eWarning("[Console] Ignore invalid peer endpoint {}", endpoint.toStdString());
+                continue;
+            }
+            node->network()->connect_to_endpoint(host, port, true, true);
         }
 
         return;

@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 project(extrachain-console LANGUAGES C CXX VERSION 1.0)
 
 set(EXTRACHAIN_STATIC_BUILD true)
-include(../extrachain-core/CMakeLists.txt)
+set(EXTRACHAIN_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../extrachain-core" CACHE PATH "ExtraChain Core source directory")
+include(${EXTRACHAIN_CORE_DIR}/CMakeLists.txt)
 set(RUN_API TRUE)
 
 # include(FetchContent)

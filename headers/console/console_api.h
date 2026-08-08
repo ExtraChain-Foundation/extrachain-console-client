@@ -20,8 +20,9 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 
 class ExtraChainNode;
 
 long long parseTimeToMs(const std::string& time_str);
-void      run_api(ExtraChainNode* node, const std::string& api_token);
+void      run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t port = 17581);
