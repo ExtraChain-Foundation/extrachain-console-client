@@ -44,6 +44,17 @@ struct SubscriptionRecord {
 BOOST_DESCRIBE_STRUCT(SubscriptionRecord, (), (until_ms, plan))
 
 namespace {
+    std::expected<ExtraChain::Contracts::ToolchainLanguage, std::string> toolchain_language(
+        const boost::json::value* value) {
+        if (value == nullptr) {
+            return ExtraChain::Contracts::ToolchainLanguage::AssemblyScript;
+        }
+        if (!value->is_string()) {
+            return std::unexpected("language must be a string");
+        }
+        return ExtraChain::Contracts::toolchain_language(value->as_string());
+    }
+
     std::expected<std::vector<std::uint8_t>, std::string> contract_arguments(const boost::json::object& json) {
         const auto* raw   = json.if_contains("arguments_base64");
         const auto* value = json.if_contains("arguments");
@@ -374,7 +385,11 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
     CROW_ROUTE(app, "/toolchain/status").methods("GET"_method)([&](const crow::request& req) {
         if (auto err = check_token_get(req))
             return std::move(*err);
-        const auto manifest = node->toolchain_registry()->manifest();
+        const auto requested = ExtraChain::Contracts::toolchain_language(
+            req.url_params.get("language") == nullptr ? "assemblyscript" : req.url_params.get("language"));
+        if (!requested.has_value())
+            return json_error(400, requested.error());
+        const auto manifest = node->toolchain_registry()->manifest(requested.value());
         if (!manifest.has_value())
             return json_error(404, manifest.error().detail);
         auto response = crow::response(200, Json::serialize(*manifest));
@@ -391,9 +406,12 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
             return std::move(*err);
         const auto first_install = object->if_contains("first_install");
         const auto allow_first = first_install != nullptr && first_install->is_bool() && first_install->as_bool();
+        const auto language    = toolchain_language(object->if_contains("language"));
+        if (!language.has_value())
+            return json_error(400, language.error());
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-        ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
         const auto                                result = installer.install_stable(allow_first);
         if (!result.has_value())
             return json_error(409, result.error().detail);
@@ -413,9 +431,12 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         const auto* source       = object->if_contains("source");
         if (project_name == nullptr || source == nullptr || !project_name->is_string() || !source->is_string())
             return json_error(400, "project_name and source strings required");
+        const auto language = toolchain_language(object->if_contains("language"));
+        if (!language.has_value())
+            return json_error(400, language.error());
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-        ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
         const auto                                result =
             installer.build_contract(QString::fromStdString(std::string(source->as_string())),
                                      QString::fromStdString(std::string(project_name->as_string())));
@@ -431,9 +452,13 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
     CROW_ROUTE(app, "/contract/components").methods("GET"_method)([&](const crow::request& req) {
         if (auto err = check_token_get(req))
             return std::move(*err);
+        const auto requested = ExtraChain::Contracts::toolchain_language(
+            req.url_params.get("language") == nullptr ? "assemblyscript" : req.url_params.get("language"));
+        if (!requested.has_value())
+            return json_error(400, requested.error());
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-        const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        const ExtraChain::Contracts::ToolchainInstaller installer(node, root, requested.value());
         const auto                                      components = installer.component_catalog();
         if (components.empty())
             return json_error(409, "contract toolchain is not installed or its catalog is invalid");
@@ -454,6 +479,9 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         if (project_name == nullptr || !project_name->is_string() || components == nullptr
             || !components->is_array() || components->as_array().empty())
             return json_error(400, "project_name and components required");
+        const auto language = toolchain_language(object->if_contains("language"));
+        if (!language.has_value())
+            return json_error(400, language.error());
         std::vector<std::string> selected;
         selected.reserve(components->as_array().size());
         for (const auto& component : components->as_array()) {
@@ -463,7 +491,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         }
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-        const ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+        const ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
         const auto                                      result =
             installer.compose_contract(selected, QString::fromStdString(std::string(project_name->as_string())));
         if (!result.has_value())
@@ -493,12 +521,14 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         const auto archive_format = text("archive_format");
         const auto version        = text("version");
         const auto data           = text("data_base64");
-        if (!platform || !architecture || !archive_format || !version || !data)
+        const auto language       = toolchain_language(object->if_contains("language"));
+        if (!platform || !architecture || !archive_format || !version || !data || !language.has_value())
             return json_error(400, "platform, architecture, archive_format, version and data_base64 required");
         const auto decoded = Utils::from_base64<std::vector<std::uint8_t>>(*data);
         if (!decoded.has_value() || decoded->empty())
             return json_error(400, "data_base64 is invalid");
-        const auto result = node->toolchain_registry()->publish_package(*platform,
+        const auto result = node->toolchain_registry()->publish_package(language.value(),
+                                                                        *platform,
                                                                         *architecture,
                                                                         *archive_format,
                                                                         *version,

@@ -70,6 +70,7 @@ namespace {
         int     token_decimals = 8;
         QString project_name;
         QString source;
+        QString language = "assemblyscript";
     };
 
     std::expected<std::vector<std::uint8_t>, std::string> arguments(const QString& value) {
@@ -103,7 +104,11 @@ namespace {
             return 0;
         }
         if (options.operation == "toolchain-status") {
-            const auto result = node->toolchain_registry()->manifest();
+            const auto language = ExtraChain::Contracts::toolchain_language(options.language.toStdString());
+            if (!language.has_value()) {
+                return fail(language.error());
+            }
+            const auto result = node->toolchain_registry()->manifest(language.value());
             if (!result.has_value()) {
                 return fail(result.error().detail);
             }
@@ -113,7 +118,11 @@ namespace {
         if (options.operation == "toolchain-enable" || options.operation == "toolchain-update") {
             const auto root =
                 QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-            ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+            const auto language = ExtraChain::Contracts::toolchain_language(options.language.toStdString());
+            if (!language.has_value()) {
+                return fail(language.error());
+            }
+            ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
             const auto result = installer.install_stable(options.operation == "toolchain-enable");
             if (!result.has_value()) {
                 return fail(result.error().detail);
@@ -124,11 +133,15 @@ namespace {
         if (options.operation == "contract-build") {
             QFile source(options.source);
             if (!source.open(QIODevice::ReadOnly)) {
-                return fail("Cannot read the Rust source file");
+                return fail("Cannot read the contract source file");
             }
             const auto root =
                 QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
-            ExtraChain::Contracts::ToolchainInstaller installer(node, root);
+            const auto language = ExtraChain::Contracts::toolchain_language(options.language.toStdString());
+            if (!language.has_value()) {
+                return fail(language.error());
+            }
+            ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
             const auto                                result =
                 installer.build_contract(QString::fromUtf8(source.readAll()), options.project_name);
             if (!result.has_value()) {
@@ -429,8 +442,12 @@ int main(int argc, char* argv[]) {
     QCommandLineOption tokenTickerOption("token-ticker", "Token ticker", "ticker");
     QCommandLineOption tokenSupplyOption("token-supply", "Initial token supply", "amount");
     QCommandLineOption tokenDecimalsOption("token-decimals", "Token decimal precision", "decimals", "8");
-    QCommandLineOption projectNameOption("project-name", "Rust contract project name", "name");
-    QCommandLineOption sourceOption("source", "Rust contract source file", "path");
+    QCommandLineOption projectNameOption("project-name", "Contract project name", "name");
+    QCommandLineOption sourceOption("source", "Contract source file", "path");
+    QCommandLineOption languageOption("contract-language",
+                                      "Contract language: assemblyscript or rust",
+                                      "language",
+                                      "assemblyscript");
 
     parser.addOptions({ debugLogsOption,
                         dirOption,
@@ -477,7 +494,8 @@ int main(int argc, char* argv[]) {
                         tokenSupplyOption,
                         tokenDecimalsOption,
                         projectNameOption,
-                        sourceOption });
+                        sourceOption,
+                        languageOption });
     parser.process(app);
 
     bool           decimals_ok = false;
@@ -494,6 +512,7 @@ int main(int argc, char* argv[]) {
         .token_decimals = parser.value(tokenDecimalsOption).toInt(&decimals_ok),
         .project_name   = parser.value(projectNameOption).trimmed(),
         .source         = parser.value(sourceOption),
+        .language       = parser.value(languageOption).trimmed().toLower(),
     };
     if (!decimals_ok) {
         one_shot.token_decimals = -1;
