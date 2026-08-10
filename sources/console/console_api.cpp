@@ -327,13 +327,17 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         };
         const std::string color      = optional_string("color", "#FA5448");
         const std::string predefined = optional_string("predefined_token_id");
-        auto              created    = node->token_manager()->create_token(wallet.id(),
+        const auto        language   = toolchain_language(object->if_contains("language"));
+        if (!language.has_value())
+            return json_error(400, language.error());
+        auto created = node->token_manager()->create_token(wallet.id(),
                                                            std::string(name->as_string()),
                                                            std::string(ticker->as_string()),
                                                            BigNumberFloat(count_text),
                                                            color,
                                                            predefined,
-                                                           decimals);
+                                                           decimals,
+                                                           *language);
         if (!created.has_value())
             return json_error(409, "token creation was rejected");
         crow::json::wvalue response;
@@ -343,6 +347,38 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         response["ticker"]   = created->ticker;
         response["count"]    = created->count.to_string();
         return crow::response(202, response);
+    });
+
+    CROW_ROUTE(app, "/token/nft/create").methods("POST"_method)([&](const crow::request& req) {
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        const auto* name     = object->if_contains("name");
+        const auto* ticker   = object->if_contains("ticker");
+        const auto  language = toolchain_language(object->if_contains("language"));
+        if (name == nullptr || ticker == nullptr || !name->is_string() || !ticker->is_string()
+            || !language.has_value())
+            return json_error(400, "name, ticker, and supported language required");
+        const auto wallet = node->account_controller()->current_wallet();
+        if (wallet.empty())
+            return json_error(409, "current wallet is not available");
+        const auto* color_value = object->if_contains("color");
+        const auto  color       = color_value != nullptr && color_value->is_string()
+                                      ? std::string(color_value->as_string())
+                                      : std::string("#FA5448");
+        auto        created     = node->token_manager()->create_nft_collection(wallet.id(),
+                                                                    std::string(name->as_string()),
+                                                                    std::string(ticker->as_string()),
+                                                                    color,
+                                                                    *language);
+        if (!created.has_value())
+            return json_error(409, "NFT collection creation was rejected");
+        auto response = crow::response(202, Json::serialize(*created));
+        response.set_header("Content-Type", "application/json");
+        return response;
     });
 
     CROW_ROUTE(app, "/token/legacy").methods("GET"_method)([&](const crow::request& req) {
@@ -361,6 +397,14 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         return response;
     });
 
+    CROW_ROUTE(app, "/token/nft/list").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        auto response = crow::response(200, Json::serialize(node->token_manager()->list_nft_collections()));
+        response.set_header("Content-Type", "application/json");
+        return response;
+    });
+
     CROW_ROUTE(app, "/token/migrate").methods("POST"_method)([&](const crow::request& req) {
         auto json   = crow::json::load(req.body);
         auto object = request_object(req);
@@ -374,7 +418,10 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         auto token_id = TokenId::create(std::string(value->as_string()));
         if (!token_id.has_value() || token_id->is_zero())
             return json_error(400, "invalid token_id");
-        auto migrated = node->token_manager()->migrate_legacy_token(*token_id);
+        const auto language = toolchain_language(object->if_contains("language"));
+        if (!language.has_value())
+            return json_error(400, language.error());
+        auto migrated = node->token_manager()->migrate_legacy_token(*token_id, *language);
         if (!migrated.has_value())
             return json_error(409, "token migration was rejected");
         auto response = crow::response(202, Json::serialize(migrated.value()));

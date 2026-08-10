@@ -161,6 +161,10 @@ namespace {
                 || options.token_decimals < 0 || options.token_decimals > 18) {
                 return fail("Token fields are invalid");
             }
+            const auto language = ExtraChain::Contracts::toolchain_language(options.language.toStdString());
+            if (!language.has_value()) {
+                return fail(language.error());
+            }
             const auto result =
                 node->token_manager()->create_token(wallet.id(),
                                                     options.token_name.toStdString(),
@@ -168,7 +172,8 @@ namespace {
                                                     BigNumberFloat(options.token_supply.toStdString()),
                                                     "#FA5448",
                                                     {},
-                                                    static_cast<std::uint8_t>(options.token_decimals));
+                                                    static_cast<std::uint8_t>(options.token_decimals),
+                                                    *language);
             if (!result.has_value()) {
                 return fail("Core rejected the token request");
             }
@@ -176,6 +181,25 @@ namespace {
             response["token_id"] = result->token_id.to_string();
             response["owner_id"] = result->owner_id.to_string();
             fmt::println("{}", boost::json::serialize(response));
+            return 0;
+        }
+        if (options.operation == "nft-create") {
+            const auto wallet   = node->account_controller()->current_wallet();
+            const auto language = ExtraChain::Contracts::toolchain_language(options.language.toStdString());
+            if (wallet.empty() || !language.has_value() || options.token_name.isEmpty()
+                || options.token_ticker.isEmpty()) {
+                return fail("A wallet, collection name, ticker, and supported language are required");
+            }
+            const auto result =
+                node->token_manager()->create_nft_collection(wallet.id(),
+                                                             options.token_name.toStdString(),
+                                                             options.token_ticker.toUpper().toStdString(),
+                                                             "#FA5448",
+                                                             *language);
+            if (!result.has_value()) {
+                return fail("Core rejected the NFT collection request");
+            }
+            fmt::println("{}", Json::serialize(*result));
             return 0;
         }
 
