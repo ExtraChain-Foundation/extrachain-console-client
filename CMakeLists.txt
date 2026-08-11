@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 project(extrachain-console LANGUAGES C CXX VERSION 1.0)
 
+if(MSVC)
+    add_compile_definitions(WIN32 _WINDOWS)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
+endif()
+
 set(EXTRACHAIN_STATIC_BUILD true)
 set(EXTRACHAIN_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../extrachain-core" CACHE PATH "ExtraChain Core source directory")
 include(${EXTRACHAIN_CORE_DIR}/CMakeLists.txt)
@@ -15,6 +20,7 @@ set(RUN_API TRUE)
 # FetchContent_MakeAvailable(googletest)
 
 find_package(Crow CONFIG REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS WebSockets)
 
 set(EXTRACHAIN_CONSOLE_SOURCES
         headers/console/console_manager.h
@@ -49,7 +55,15 @@ target_compile_definitions(extrachain-console PRIVATE
         GIT_BRANCH="${GIT_BRANCH}"
 )
 
-target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network Qt6::WebSockets extrachain Crow::Crow asio::asio)
+target_link_libraries(extrachain-console PRIVATE
+    Qt6::Core
+    Qt6::Network
+    Qt6::WebSockets
+    extrachain
+    extrachain-qt-compat
+    Crow::Crow
+    asio::asio
+)
 
 if(UNIX AND NOT APPLE) # LINUX
     target_link_libraries(extrachain-console PRIVATE stdc++exp backtrace)

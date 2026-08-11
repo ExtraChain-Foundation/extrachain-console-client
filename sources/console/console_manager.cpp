@@ -20,8 +20,10 @@
 #include "console/console_manager.h"
 
 #include <QProcess>
+#include <QRegularExpression>
 #include <QTextStream>
 
+#include "adapters/qt/actor_id_adapter.h"
 #include "managers/thread_pool.h"
 #include "dfs/dfs_controller.h"
 #include "chain/actor_index.h"
@@ -297,7 +299,8 @@ void ConsoleManager::commandReceiver(QString command) {
             return;
         }
         QString fileName =
-            QString("%1.extrachain").arg(node->account_controller()->system_actor().id().toQString());
+            QString("%1.extrachain")
+                .arg(ExtraChain::QtCompat::to_qstring(node->account_controller()->system_actor().id()));
         QFile file(fileName);
         if (!file.open(QFile::WriteOnly)) {
             eInfo("Can't open {} for writing: {}", fileName, file.errorString());

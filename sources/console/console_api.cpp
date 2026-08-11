@@ -20,22 +20,26 @@
 #include "console/console_api.h"
 
 #include <algorithm>
-#include "crow.h"
 #include <chrono>
+#include <map>
 #include <mutex>
 #include <regex>
+
+#include "crow.h"
+
+#include <boost/describe.hpp>
+
 #include <QFile>
 #include <QStandardPaths>
 
-#include "managers/extrachain_node.h"
-#include "contracts/contract_manager.h"
-#include "contracts/contract_codec.h"
-#include "contracts/toolchain_registry.h"
 #include "chain/dag.h"
+#include "contracts/contract_codec.h"
+#include "contracts/contract_manager.h"
+#include "contracts/toolchain_registry.h"
 #include "dfs/dfs_controller.h"
+#include "managers/extrachain_node.h"
 #include "managers/token_manager.h"
 #include "utils/exc_utils.h"
-#include <boost/describe.hpp>
 
 struct SubscriptionRecord {
     std::uint64_t until_ms = 0;
@@ -228,7 +232,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         QFile f("minting_actor.json");
         if (!f.open(QIODevice::ReadOnly))
             return std::nullopt;
-        auto a = Actor<KeyPrivate>::fromJson(f.readAll());
+        auto a = Actor<KeyPrivate>::fromJson(f.readAll().toStdString());
         f.close();
         if (a.empty())
             return std::nullopt;
@@ -523,9 +527,13 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
             return std::move(*err);
         const auto* project_name = object->if_contains("project_name");
         const auto* components   = object->if_contains("components");
+        const auto* blueprint    = object->if_contains("blueprint_id");
+        const auto* parameters   = object->if_contains("parameters");
         if (project_name == nullptr || !project_name->is_string() || components == nullptr
-            || !components->is_array() || components->as_array().empty())
-            return json_error(400, "project_name and components required");
+            || !components->is_array() || components->as_array().empty() || blueprint == nullptr
+            || !blueprint->is_string() || blueprint->as_string().empty()
+            || (parameters != nullptr && !parameters->is_object()))
+            return json_error(400, "project_name, components, and blueprint_id required");
         const auto language = toolchain_language(object->if_contains("language"));
         if (!language.has_value())
             return json_error(400, language.error());
@@ -536,11 +544,31 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
                 return json_error(400, "each component must be a non-empty string");
             selected.emplace_back(component.as_string());
         }
+        std::map<std::string, std::string> values;
+        if (parameters != nullptr) {
+            for (const auto& parameter : parameters->as_object()) {
+                const auto& value = parameter.value();
+                const auto  name  = std::string(parameter.key());
+                if (value.is_string()) {
+                    values.emplace(name, std::string(value.as_string()));
+                } else if (value.is_int64()) {
+                    values.emplace(name, std::to_string(value.as_int64()));
+                } else if (value.is_uint64()) {
+                    values.emplace(name, std::to_string(value.as_uint64()));
+                } else if (value.is_bool()) {
+                    values.emplace(name, value.as_bool() ? "true" : "false");
+                } else {
+                    return json_error(400, "each parameter must be a string, integer, or boolean");
+                }
+            }
+        }
         const auto root =
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/contract-toolchain";
         const ExtraChain::Contracts::ToolchainInstaller installer(node, root, language.value());
-        const auto                                      result =
-            installer.compose_contract(selected, QString::fromStdString(std::string(project_name->as_string())));
+        const auto result = installer.compose_contract(selected,
+                                                       blueprint->as_string(),
+                                                       values,
+                                                       QString::fromStdString(std::string(project_name->as_string())));
         if (!result.has_value())
             return json_error(409, result.error().detail);
         boost::json::object body;

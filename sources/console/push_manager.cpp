@@ -21,11 +21,13 @@
 
 #include <QJsonObject>
 
+#include "adapters/qt/byte_array_adapter.h"
 #include "chain/actor_index.h"
 
 PushManager::PushManager(ExtraChainNode *node, QObject *parent)
-    : QObject(parent) {
-    manager = new QNetworkAccessManager(this);
+    : QObject(parent)
+    , manager(new QNetworkAccessManager(this))
+    , node(node) {
     connect(manager, &QNetworkAccessManager::finished, this, &PushManager::responseResolver);
 }
 
@@ -38,8 +40,12 @@ void PushManager::pushNotification(QString actorId, Notification notification) {
         return;
     auto &key = main.key();
 
-    auto        encrypt_res      = key.encrypt_self(ByteArray(actorId).toBytes());
-    QByteArray  actorIdEncrypted = ByteArray(encrypt_res.value()).toQByteArray();
+    const auto encrypt_res = key.encrypt_self(ByteArray(actorId.toStdString()).toBytes());
+    if (!encrypt_res.has_value()) {
+        eWarning("[Push] Cannot encrypt the actor ID");
+        return;
+    }
+    QByteArray actorIdEncrypted = ExtraChain::QtCompat::to_qbyte_array(ByteArray(encrypt_res.value()));
     DbConnector db("notification");
     db.open();
     auto res = actorId == "all" ? db.select("SELECT * FROM Notification")

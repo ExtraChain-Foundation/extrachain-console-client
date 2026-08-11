@@ -837,7 +837,7 @@ int main(int argc, char* argv[]) {
             if (!mint_file.open(QIODevice::ReadOnly)) {
                 eCritical("[create-mint-subs] failed to open minting_actor.json");
             } else {
-                auto mint_actor = Actor<KeyPrivate>::fromJson(mint_file.readAll());
+                auto mint_actor = Actor<KeyPrivate>::fromJson(mint_file.readAll().toStdString());
                 mint_file.close();
                 if (mint_actor.empty()) {
                     eCritical("[create-mint-subs] failed to parse minting_actor.json");
