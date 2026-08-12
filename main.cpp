@@ -38,6 +38,7 @@
 #include "console/console_manager.h"
 #include "managers/extrachain_node.h"
 #include "utils/exc_logs.h"
+#include "adapters/qt/logging_adapter.h"
 #include "metatypes.h"
 
 #include "console/console_api.h"

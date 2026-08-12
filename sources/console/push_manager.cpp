@@ -19,6 +19,8 @@
 
 #include "console/push_manager.h"
 
+#include "adapters/qt/logging_adapter.h"
+
 #include <QJsonObject>
 
 #include "adapters/qt/byte_array_adapter.h"
