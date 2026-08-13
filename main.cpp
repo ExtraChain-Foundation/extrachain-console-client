@@ -30,6 +30,7 @@
 #include "dfs/dfs_controller.h"
 #include "contracts/contract_codec.h"
 #include "contracts/toolchain_registry.h"
+#include "adapters/qt/toolchain_installer.h"
 #include "extrachain_version.h"
 #include "managers/token_manager.h"
 #include "managers/thoth_manager.h"
@@ -39,6 +40,7 @@
 #include "managers/extrachain_node.h"
 #include "utils/exc_logs.h"
 #include "adapters/qt/logging_adapter.h"
+#include "adapters/qt/utils_adapter.h"
 #include "metatypes.h"
 
 #include "console/console_api.h"
@@ -544,10 +546,10 @@ int main(int argc, char* argv[]) {
     }
 
     // TODO: allow absolute directory
-    QString dirName = Utils::fix_file_name(parser.value(dirOption), "");
-    Utils::dataDir(dirName.isEmpty() ? "console-data" : dirName);
-    QDir().mkdir(Utils::dataDir());
-    QDir::setCurrent(QDir::currentPath() + QDir::separator() + Utils::dataDir());
+    QString dirName = ExtraChain::Qt::sanitize_file_name(parser.value(dirOption), "");
+    ExtraChain::Qt::data_dir(dirName.isEmpty() ? "console-data" : dirName);
+    QDir().mkdir(ExtraChain::Qt::data_dir());
+    QDir::setCurrent(QDir::currentPath() + QDir::separator() + ExtraChain::Qt::data_dir());
     Logger::start_file();
 
     if (parser.isSet(clearDataOption)) {
@@ -584,9 +586,12 @@ int main(int argc, char* argv[]) {
         eInfo(" │     Console: {} | Core: {}     │", GIT_COMMIT, GIT_COMMIT_CORE);
     eInfo(" └───────────────────────────────────────────┘");
     install_qt_log_handler();
-    qInfo().noquote().nospace() << "[Build Info] " << Utils::detect_compiler() << ", Qt " << QT_VERSION_STR
-                                << ", SQLite " << DbConnector::sqlite_version() << ", Sodium "
-                                << Utils::sodium_version().c_str() << ", Boost " << Utils::boost_version();
+    eInfo("[Build Info] {}, Qt {}, SQLite {}, Sodium {}, Boost {}",
+          ExtraChain::Qt::compiler_info(),
+          QT_VERSION_STR,
+          DbConnector::sqlite_version(),
+          Utils::sodium_version(),
+          Utils::boost_version());
     // << ", Boost Asio " << Utils::boostAsioVersion();
     if (QString(GIT_BRANCH) != "dev" || QString(GIT_BRANCH_CORE) != "dev")
         qInfo().noquote() << "[Branches] Console:" << GIT_BRANCH << "| ExtraChain Core:" << GIT_BRANCH_CORE;

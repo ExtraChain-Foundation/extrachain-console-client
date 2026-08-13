@@ -65,8 +65,8 @@ private:
     ConsoleInput consoleInput;
 #endif
 
-    ExtraChainNode *node;
-    PushManager    *m_pushManager;
+    ExtraChainNode *node          = nullptr;
+    PushManager    *m_pushManager = nullptr;
 };
 
 #endif // READER_H

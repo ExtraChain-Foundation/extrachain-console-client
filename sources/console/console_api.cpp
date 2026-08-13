@@ -17,7 +17,10 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include "crow.h"
+
 #include "console/console_api.h"
+#include "adapters/qt/toolchain_installer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -25,11 +28,10 @@
 #include <mutex>
 #include <regex>
 
-#include "crow.h"
-
 #include <boost/describe.hpp>
 
 #include <QFile>
+#include <QDateTime>
 #include <QStandardPaths>
 
 #include "chain/dag.h"

@@ -19,11 +19,15 @@
 
 #include "console/console_manager.h"
 
+#include <QDir>
+#include <QFile>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QTextStream>
 
 #include "adapters/qt/actor_id_adapter.h"
+#include "adapters/qt/logging_adapter.h"
+#include "adapters/qt/utils_adapter.h"
 #include "managers/thread_pool.h"
 #include "dfs/dfs_controller.h"
 #include "chain/actor_index.h"
@@ -46,7 +50,7 @@ ConsoleManager::ConsoleManager(QObject *parent)
 // , notifierInput(stdin, QIODevice::ReadOnly)
 #endif
 {
-    m_pushManager = new PushManager(node);
+    m_pushManager = new PushManager(nullptr, this);
 }
 
 ConsoleManager::~ConsoleManager() {
@@ -170,8 +174,13 @@ void ConsoleManager::commandReceiver(QString command) {
         if (connections->size() > 0) {
             eInfo("Connections:");
             std::for_each(connections->begin(), connections->end(), [](auto &el) {
-                qInfo().noquote() << el->ip() << el->port() << el->server_port() << el->is_active()
-                                  << el->protocol_string() << el->identifier();
+                eInfo("{} {} {} {} {} {}",
+                      el->ip(),
+                      el->port(),
+                      el->server_port(),
+                      el->is_active(),
+                      el->protocol_string(),
+                      el->identifier());
             });
         } else {
             eInfo("No connections");
@@ -186,10 +195,10 @@ void ConsoleManager::commandReceiver(QString command) {
 
         QString ip = list[2];
         if (ip == "local")
-            ip = Utils::findLocalIp().ip().toString();
+            ip = ExtraChain::Qt::local_ip().ip().toString();
         QString protocol = list[1];
 
-        if (Utils::isValidIp(ip) && (protocol == "udp" || protocol == "ws")) {
+        if (ExtraChain::Qt::valid_ip(ip) && (protocol == "udp" || protocol == "ws")) {
             auto networkProtocol = Network::Protocol::WebSocket;
             if (list.length() == 4) {
                 bool          port_ok = false;
@@ -342,6 +351,7 @@ PushManager *ConsoleManager::pushManager() const {
 
 void ConsoleManager::setExtraChainNode(ExtraChainNode *value) {
     node = value;
+    m_pushManager->setAccController(value);
 
     // auto dfs = node->dfs();
     connect(node, &ExtraChainNode::pushNotification, m_pushManager, &PushManager::pushNotification);

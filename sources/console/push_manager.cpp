@@ -21,16 +21,23 @@
 
 #include "adapters/qt/logging_adapter.h"
 
+#include <QFile>
+#include <QJsonDocument>
 #include <QJsonObject>
 
 #include "adapters/qt/byte_array_adapter.h"
 #include "chain/actor_index.h"
+#include "managers/extrachain_node.h"
 
 PushManager::PushManager(ExtraChainNode *node, QObject *parent)
     : QObject(parent)
     , manager(new QNetworkAccessManager(this))
     , node(node) {
     connect(manager, &QNetworkAccessManager::finished, this, &PushManager::responseResolver);
+}
+
+void PushManager::setAccController(ExtraChainNode *new_node) {
+    node = new_node;
 }
 
 void PushManager::pushNotification(QString actorId, Notification notification) {
@@ -183,7 +190,7 @@ void PushManager::sendNotification(const QString &token, const QString &os, cons
 
     QJsonObject data;
     data["notifyType"] = notification.type;
-    data["data"]       = QString(notification.data);
+    data["data"]       = QString::fromStdString(notification.data);
     json["data"]       = data;
 
     QString jsonStr = QJsonDocument(json).toJson();
