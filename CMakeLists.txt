@@ -9,6 +9,7 @@ endif()
 
 set(EXTRACHAIN_STATIC_BUILD true)
 set(EXTRACHAIN_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../extrachain-core" CACHE PATH "ExtraChain Core source directory")
+set(EXTRACHAIN_BUILD_QT_COMPAT ON CACHE BOOL "" FORCE)
 include(${EXTRACHAIN_CORE_DIR}/CMakeLists.txt)
 set(RUN_API TRUE)
 
@@ -60,7 +61,6 @@ target_link_libraries(extrachain-console PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::WebSockets
-    extrachain
     extrachain-qt-compat
     Crow::Crow
     asio::asio
