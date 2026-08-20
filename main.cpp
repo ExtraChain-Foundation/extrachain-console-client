@@ -448,7 +448,6 @@ int main(int argc, char* argv[]) {
                        backfillTokenAllocationsOption("backfill-token-allocations",
                                        "Backfill token allocations from chain (April 1 2026 to now)");
     QCommandLineOption megaImportOption("import-from-mega", "Import from console-data/0 file");
-    QCommandLineOption clearBalance("clear-balance", "Clear txs with balance < 0");
     QCommandLineOption dagMode("dag-mode", "Choose dag mode: full / light", "mode");
     QCommandLineOption dfsMode("dfs-mode", "Choose dfs mode: full / light", "mode");
     QCommandLineOption regenControls("regen-controls", "Regerarate controls");
@@ -495,7 +494,6 @@ int main(int argc, char* argv[]) {
                         subscriptionOption,
                         chatOption,
                         megaImportOption,
-                        clearBalance,
                         dagMode,
                         dfsMode,
                         regenControls,
@@ -901,15 +899,6 @@ int main(int argc, char* argv[]) {
             node->blockchain()->getBlockIndex().addBlock(mega.value());
             qApp->exit();
             */
-        }
-
-        bool is_local_clear_balance = parser.isSet(clearBalance);
-        if (is_local_clear_balance) {
-            eLog("Starting clear balances...");
-            auto actors = node->dag()->cache().local_clear_less_balances();
-            eLog("Done clear balances");
-            std::vector<ActorId> vec(actors.begin(), actors.end());
-            eLog("++++ {}", node->dag()->calculate_actors_balance(vec));
         }
 
         // eLog("++++ {}",

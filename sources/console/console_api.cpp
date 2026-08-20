@@ -411,7 +411,7 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         return response;
     });
 
-    CROW_ROUTE(app, "/token/migrate").methods("POST"_method)([&](const crow::request& req) {
+    CROW_ROUTE(app, "/token/migration/publish-target").methods("POST"_method)([&](const crow::request& req) {
         auto json   = crow::json::load(req.body);
         auto object = request_object(req);
         if (!json || !object.has_value())
@@ -427,10 +427,44 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         const auto language = toolchain_language(object->if_contains("language"));
         if (!language.has_value())
             return json_error(400, language.error());
-        auto migrated = node->token_manager()->migrate_legacy_token(*token_id, *language);
-        if (!migrated.has_value())
-            return json_error(409, "token migration was rejected");
-        auto response = crow::response(202, Json::serialize(migrated.value()));
+        auto published = node->token_manager()->publish_legacy_token_target(*token_id, *language);
+        if (!published.has_value())
+            return json_error(409, "migration target publication was rejected");
+        crow::json::wvalue response;
+        response["transaction_hash"]   = published->hash();
+        response["target_contract_id"] = published->receiver().to_string();
+        return crow::response(202, response);
+    });
+
+    CROW_ROUTE(app, "/token/migration/link").methods("POST"_method)([&](const crow::request& req) {
+        auto json   = crow::json::load(req.body);
+        auto object = request_object(req);
+        if (!json || !object.has_value())
+            return json_error(400, "invalid json");
+        if (auto err = check_token_post(json))
+            return std::move(*err);
+        const auto* token_value  = object->if_contains("token_id");
+        const auto* target_value = object->if_contains("target_contract_id");
+        if (token_value == nullptr || target_value == nullptr || !token_value->is_string()
+            || !target_value->is_string())
+            return json_error(400, "token_id and target_contract_id required");
+        auto token_id = TokenId::create(std::string(token_value->as_string()));
+        auto target   = ActorId::create(std::string(target_value->as_string()));
+        if (!token_id.has_value() || token_id->is_zero() || !target.has_value() || target->is_zero())
+            return json_error(400, "invalid token_id or target_contract_id");
+        auto linked = node->token_manager()->link_legacy_token(*token_id, *target);
+        if (!linked.has_value())
+            return json_error(409, "token migration link was rejected");
+        crow::json::wvalue response;
+        response["transaction_hash"]   = linked->hash();
+        response["target_contract_id"] = target->to_string();
+        return crow::response(202, response);
+    });
+
+    CROW_ROUTE(app, "/token/migration/status").methods("GET"_method)([&](const crow::request& req) {
+        if (auto err = check_token_get(req))
+            return std::move(*err);
+        auto response = crow::response(200, Json::serialize(node->token_manager()->migration_statuses()));
         response.set_header("Content-Type", "application/json");
         return response;
     });
