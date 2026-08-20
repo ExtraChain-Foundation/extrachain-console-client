@@ -21,6 +21,20 @@ local atomic state head and do not create a state file or manifest.
 | `GET` | `/contract/inspect` | Read the active version and state hashes |
 | `POST` | `/contract/upgrade` | Submit an owner-approved immutable module upgrade |
 
+Legacy token migration uses separate operations. Core does not create and link a target contract
+in one request.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/token/migration/publish-target` | Publish an inactive standard token contract |
+| `POST` | `/token/migration/link` | Link a legacy token to its confirmed target contract |
+| `GET` | `/token/migration/status` | Read migration progress and errors |
+
+The publish request requires `token_id`, `token`, and an optional `language`. It returns the deploy
+transaction hash and `target_contract_id`. Wait until this deployment is confirmed. Then send
+`token_id`, `target_contract_id`, and `token` to the link endpoint. The status endpoint accepts the
+API token as a query parameter.
+
 To start the API, pass `--api-token` on launch:
 ```bash
 ./extrachain-console --api-token <your_token>
