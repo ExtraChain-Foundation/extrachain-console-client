@@ -63,6 +63,10 @@ If Linux ARM, before:
 
 6. Build project.
 
+## Thoth provisioning
+
+Use `--create-thoth-dictionary` to create the current `ThothDevicesV2` dictionary. The operation is idempotent. The console does not create or read the legacy `Thoth` vector.
+
 ## IDE Settings
 ### CMake
 Use something like:
