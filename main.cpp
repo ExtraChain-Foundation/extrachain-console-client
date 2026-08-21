@@ -218,7 +218,7 @@ int main(int argc, char* argv[]) {
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
-    QCommandLineOption thothOption("create-thoth-template", "Create Thoth template");
+    QCommandLineOption thothDictionaryOption("create-thoth-dictionary", "Create ThothDevicesV2 dictionary");
     QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
     QCommandLineOption channelsVectorOption("create-channels-vector", "Create channels vector");
     QCommandLineOption tokenAllocationsOption("create-token-allocations",
@@ -257,7 +257,7 @@ int main(int argc, char* argv[]) {
                         dfsMode,
                         regenControls,
                         renamesOption,
-                        thothOption,
+                        thothDictionaryOption,
                         fileIdOption,
                         channelsVectorOption,
                         tokenAllocationsOption,
@@ -459,23 +459,13 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        bool is_thoth = parser.isSet(thothOption);
+        bool is_thoth = parser.isSet(thothDictionaryOption);
         if (is_thoth || is_new_network) {
-            auto res = node->thoth_manager()->create_thoth_template();
+            auto res = node->thoth_manager()->create_thoth_dictionary();
             if (!res) {
-                eInfo("Can't create Thoth vector template");
+                eInfo("Can't create ThothDevicesV2 dictionary");
             } else {
-                eSuccess("Thoth vector template created");
-            }
-        }
-
-        bool is_thoth_vector = parser.isSet(thothOption);
-        if (is_thoth_vector || is_new_network) {
-            auto res = node->thoth_manager()->create_thoth_vector();
-            if (!res) {
-                eInfo("Can't create Thoth vector template");
-            } else {
-                eSuccess("Thoth vector created");
+                eSuccess("ThothDevicesV2 dictionary ready");
             }
         }
 
