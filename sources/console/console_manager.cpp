@@ -306,6 +306,269 @@ void ConsoleManager::commandReceiver(QString command) {
         }
         std::cout << "======================================================" << std::endl;
     }
+
+    if (command.startsWith("account_settings")) {
+        if (command.contains("change_password")) {
+            QStringList l = command.split(" ");
+            if (l.size() == 6) {
+                std::string currentLogin    = l[2].toStdString();
+                std::string currentPassword = l[3].toStdString();
+                std::string newLogin        = l[4].toStdString();
+                std::string newPassword     = l[5].toStdString();
+
+                eInfo("Entered parameters: current_login={}, current_password={}, new_login={}, new_password={}",
+                      currentLogin,
+                      currentPassword,
+                      newLogin,
+                      newPassword);
+
+                const bool result = node->account_controller()->change_credentials(currentLogin,
+                                                                                   currentPassword,
+                                                                                   newLogin,
+                                                                                   newPassword);
+                if (result) {
+                    eInfo("Credentials changed.");
+                } else {
+                    eWarning("Credentials doesn't changed.");
+                }
+            } else {
+                eWarning("Invalid arguments. Expected 6 parameters, got {}", l.size());
+                eInfo(
+                    "Usage: account_settings change_password <current_login> <current_password> <new_login> "
+                    "<new_password>");
+                eInfo("Example: account_settings change_password john old_pass123 john new_pass456");
+            }
+        }
+
+        if (command.contains("change_username")) {
+            QStringList l = command.split(" ");
+
+            if (l.size() == 3) {
+                QString newUserName = l[2];
+                if (newUserName.length() <= 5) {
+                    eWarning("Invalid username. Username length must be more 5 characters.");
+                    return;
+                }
+
+                if (newUserName.length() >= 30) {
+                    eWarning("Invalid username. Username must be under 30 characters");
+                    return;
+                }
+
+                static const QRegularExpression re("^[A-Za-z_][A-Za-z0-9_]*$");
+                if (!re.match(newUserName).hasMatch()) {
+                    eWarning("Invalid username. Username can only contain letters, numbers, underscore and dot");
+                    return;
+                }
+
+                std::vector<std::string> domainEndings = { ".com",  ".org",    ".net",  ".io",  ".app", ".dev",
+                                                           ".co",   ".me",     ".info", ".biz", ".tv",  ".cc",
+                                                           ".site", ".online", ".ai",   ".ua" };
+                for (int i = 0; i < domainEndings.size(); i++) {
+                    if (newUserName.endsWith(QString::fromStdString(domainEndings[i]), Qt::CaseInsensitive)) {
+                        eWarning("Invalid username. Username cannot look like a domain name");
+                        return;
+                    }
+                }
+
+                std::vector<std::string> forbiddenWords     = { "extrachain" };
+                std::vector<std::string> forbiddenPatterns  = { "rac+o+n", "fu+c+k",  "sh+i+t", "da+mn",
+                                                                "di+c+k",  "co+c+k",  "cu+nt",  "bi+tc+h",
+                                                                "ro+o+t",  "a+dmi+n", "syste+m" };
+                std::vector<std::string> impersonationWords = {
+                    "moderator", "support",   "official", "staff",  "help",     "service", "google",
+                    "facebook",  "microsoft", "apple",    "amazon", "twitter",  "openai",  "anthropic",
+                    "tesla",     "nvidia",    "chatgpt",  "claude", "gemini",   "copilot", "assistant",
+                    "bitcoin",   "ethereum",  "binance",  "kraken", "coinbase", "whitebit"
+                };
+
+                QString normalizedUsername = newUserName.toLower().remove(QRegularExpression("[._]"));
+                for (int ii = 0; ii < forbiddenWords.size(); ii++) {
+                    if (normalizedUsername.contains(forbiddenWords[ii].c_str())) {
+                        eWarning("Invalid username. Username contains forbidden words");
+                        return;
+                    }
+                }
+
+                for (int j = 0; j < forbiddenPatterns.size(); j++) {
+                    QRegularExpression pattern = QRegularExpression(forbiddenPatterns[j].c_str(),
+                                                                    QRegularExpression::CaseInsensitiveOption);
+                    if (pattern.match(newUserName).hasMatch()) {
+                        eWarning("Invalid username. Username contains forbidden words");
+                        return;
+                    }
+                }
+
+                for (int k = 0; k < impersonationWords.size(); k++) {
+                    if (normalizedUsername.contains(impersonationWords[k].c_str())) {
+                        eWarning("Invalid username. Username cannot contain official or brand names");
+                        return;
+                    }
+                }
+
+                auto network_id = node->actor_index()->network_id();
+                if (network_id.is_zero()) {
+                    QFile network(".network_id");
+                    if (network.open(QFile::ReadOnly)) {
+                        auto data = network.readAll();
+                        network.close();
+
+                        if (!data.isEmpty()) {
+                            auto actor_id = ActorId::create(data.toStdString());
+                            if (actor_id.has_value()) {
+                                network_id = actor_id.value();
+                            } else {
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                if (network_id.is_zero()) {
+                    return;
+                }
+
+                std::string usernames_file_id;
+                bool        m_usernameActive = false;
+                auto        search_result =
+                    Dfs::Tables::DirsFile::ActorSpace::search_file_by_folder_and_name(node->dfs()
+                                                                                          ->get_db_instance(),
+                                                                                      network_id,
+                                                                                      Dfs::Basic::TEMPLATE_VECTOR,
+                                                                                      "Usernames");
+                auto db_instance    = node->dfs()->dirs_manager().get_db_instance();
+                auto search_result2 = Dfs::Tables::DirsFile::ActorSpace::
+                    search_file_by_folder_and_name(db_instance,
+                                                   network_id,
+                                                   Dfs::Basic::TEMPLATE_COLLECTION_TEMPLATE,
+                                                   "Usernames");
+                if (!search_result.has_value()) {
+                    return;
+                }
+                if (!search_result2.has_value()) {
+                    return;
+                }
+
+                if (search_result->state == Dfs::FileState::Ready
+                    && search_result2->state == Dfs::FileState::Ready) {
+                    usernames_file_id = search_result->file_id;
+                    m_usernameActive  = true;
+                }
+
+                if (search_result->state != Dfs::FileState::Ready
+                    || search_result2->state != Dfs::FileState::Ready) {
+                    return;
+                }
+
+                auto v = DfsVector::load(node,
+                                         node->account_controller()->system_actor(),
+                                         network_id,
+                                         usernames_file_id);
+                if (!v.has_value()) {
+                    return;
+                }
+
+                auto main_id = node->account_controller()->current_profile().main_id();
+                auto row =
+                    v->read_rows(fmt::format("WHERE name='{}' COLLATE NOCASE AND status = '1' AND actor != '{}'",
+                                             newUserName.toStdString(),
+                                             main_id));
+
+                if (row.has_value()) {
+                    eWarning("Invalid username. Username already exists");
+                    return;
+                }
+
+                auto res = node->dfs()->add_vector_row(network_id,
+                                                       usernames_file_id,
+                                                       {
+                                                           { "name", newUserName.toStdString() },
+                                                       });
+
+                if (res) {
+                    eInfo("Username saved successfully");
+                } else {
+                    eInfo("Error saved username");
+                }
+            } else {
+                eWarning("Invalid arguments. Expected 3 parameters, got {}", l.size());
+                eInfo("Usage: account_settings change_username <new_username>");
+                eInfo("Example: account_settings change_username john7travolta");
+            }
+        }
+
+        if (command.contains("export")) {
+            QStringList l = command.split(" ");
+            if (l.size() > 2 && l.size() <= 5) {
+                QString type     = l[2];
+                auto    mnemonic = node->account_controller()->seed_mnemonic();
+
+                QStringList phrases;
+                for (const auto &word : mnemonic) {
+                    phrases << QString::fromStdString(word);
+                }
+
+                if (type == "file") {
+                    if (l.size() != 5) {
+                        eWarning("Invalid arguments. For file expected 5 parameters, got {}", l.size());
+                    } else {
+                        QString   savedPath = l[3];
+                        QString   nameFile  = l[4];
+                        QFileInfo info(savedPath);
+                        if (info.isDir()) {
+                            eInfo("Try to save in {}", savedPath);
+                            std::expected<std::string, ImportError> res = node->export_profile();
+                            if (!res.has_value()) {
+                                QString errorText =
+                                    tr("Export operation failed: ")
+                                    + QString::fromStdString(Utils::enum_value_name_value(res.error()));
+
+                                eInfo("Error export file: {}", errorText);
+                            }
+
+                            QString filePath = QString("%1/%2").arg(savedPath, nameFile);
+                            auto    fs_path  = FsPath::create(filePath.toStdString());
+                            if (!fs_path.has_value()) {
+                                eWarning("Export operation failed: file path");
+                                return;
+                            }
+                            std::ofstream file(fs_path->native(), std::ios::binary);
+                            if (!file) {
+                                eWarning("Export operation failed: file access");
+                                return;
+                            }
+
+                            auto fileContent = node->account_controller()->profile_type() == ProfileType::New
+                                                   ? res.value()
+                                                   : Utils::to_base64(res.value());
+
+                            if (!file.write(fileContent.c_str(), fileContent.size())) {
+                                eWarning("Export operation failed: file write");
+                                return;
+                            } else {
+                                eWarning("Exported as file. {}", filePath);
+                            }
+                            file.close();
+                        } else {
+                            eWarning("Invalid. This is not folder.");
+                        }
+                    }
+                } else if (type == "phrase") {
+                    eInfo("{}", phrases);
+                } else if (type == "hex") {
+                    const std::string generatedHex = node->account_controller()->seed_hex();
+                    auto              hex          = QString::fromStdString(generatedHex);
+                    eInfo("HEX: [{}]", hex);
+                } else {
+                    eWarning("Invalid arguments. Expected file/phrase/hex");
+                }
+            } else {
+                eWarning("Invalid arguments. Expected 3 parameters, got {}", l.size());
+                eInfo("Usage: account_settings export <type>");
+                eInfo("Example: account_settings export file/phrase/hex");
+            }
+        }
+    }
 }
 
 PushManager *ConsoleManager::pushManager() const {
