@@ -1427,6 +1427,8 @@ void run_api(ExtraChainNode* node, const std::string& api_token, std::uint16_t p
         }
     });
 
+    // Crow traps SIGINT and SIGTERM by default and stops only the API server; leave them to the console handler.
+    app.signal_clear();
     app.bindaddr("0.0.0.0").port(port).concurrency(2).run();
     eLog("Started api on port {}", port);
 }
