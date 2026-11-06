@@ -65,7 +65,16 @@ If Linux ARM, before:
 
 ## Thoth provisioning
 
-Use `--create-thoth-dictionary` to create the current `ThothDevicesV2` dictionary. The operation is idempotent. The console does not create or read the legacy `Thoth` vector.
+Build this `dev` branch with ExtraChain Core `dev`. Set `EXTRACHAIN_CORE_DIR` to that Core source
+directory when it is not the adjacent `extrachain-core` directory.
+
+Use `--create-thoth-template` to create the `Thoth` collection template and then its vector. The
+console creates the vector only if template creation succeeds. New network creation with `--core`
+runs the same steps.
+
+The `dev` branch uses the Core template and vector API. It does not accept
+`--create-thoth-dictionary`. The `boost/core-dev-1.0` line uses a different Thoth registry and
+requires its matching Console branch.
 
 ## IDE Settings
 ### CMake

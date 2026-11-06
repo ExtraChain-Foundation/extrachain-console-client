@@ -25,6 +25,7 @@
 #include <QStandardPaths>
 
 #include <csignal>
+#include <cstdlib>
 
 #include "dfs/dfs_controller.h"
 #include "extrachain_version.h"
@@ -218,7 +219,7 @@ int main(int argc, char* argv[]) {
                                           "Create subscription template from network id");
     QCommandLineOption chatOption("create-chat-templates", "Create chat templates from network id");
     QCommandLineOption renamesOption("create-renames-template", "Create renames template");
-    QCommandLineOption thothDictionaryOption("create-thoth-dictionary", "Create ThothDevicesV2 dictionary");
+    QCommandLineOption thothOption("create-thoth-template", "Create Thoth template and vector");
     QCommandLineOption fileIdOption("create-fileid-template", "Create FileId template");
     QCommandLineOption channelsVectorOption("create-channels-vector", "Create channels vector");
     QCommandLineOption tokenAllocationsOption("create-token-allocations",
@@ -257,7 +258,7 @@ int main(int argc, char* argv[]) {
                         dfsMode,
                         regenControls,
                         renamesOption,
-                        thothDictionaryOption,
+                        thothOption,
                         fileIdOption,
                         channelsVectorOption,
                         tokenAllocationsOption,
@@ -387,7 +388,12 @@ int main(int argc, char* argv[]) {
         QString importFile = parser.value(importOption);
         if (!importFile.isEmpty()) {
             QFile file(importFile);
-            file.open(QFile::ReadOnly);
+            if (!file.open(QFile::ReadOnly)) {
+                eCritical("Can't open import file {}: {}",
+                          importFile.toStdString(),
+                          file.errorString().toStdString());
+                std::exit(EXIT_FAILURE);
+            }
             auto data = file.readAll().toStdString();
             if (data.empty()) {
                 eInfo("Incorrect import");
@@ -459,13 +465,17 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        bool is_thoth = parser.isSet(thothDictionaryOption);
+        bool is_thoth = parser.isSet(thothOption);
         if (is_thoth || is_new_network) {
-            auto res = node->thoth_manager()->create_thoth_dictionary();
-            if (!res) {
-                eInfo("Can't create ThothDevicesV2 dictionary");
+            if (!node->thoth_manager()->create_thoth_template()) {
+                eInfo("Can't create Thoth template");
             } else {
-                eSuccess("ThothDevicesV2 dictionary ready");
+                eSuccess("Thoth template created");
+                if (!node->thoth_manager()->create_thoth_vector()) {
+                    eInfo("Can't create Thoth vector");
+                } else {
+                    eSuccess("Thoth vector created");
+                }
             }
         }
 
