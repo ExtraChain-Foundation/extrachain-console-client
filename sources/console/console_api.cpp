@@ -24,6 +24,12 @@
 #include <mutex>
 #include <regex>
 #include <QFile>
+#ifdef EXTRACHAIN_VPN_ISSUER
+#include "console/vpn_issuer_api.h"
+#include "vpn_grant_issuer.h"
+#include <QDateTime>
+#include <QJsonDocument>
+#endif
 
 #include "managers/extrachain_node.h"
 #include "chain/dag.h"
@@ -482,6 +488,28 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
     });
 
     static std::mutex subscription_mutex;
+#ifdef EXTRACHAIN_VPN_ISSUER
+    auto vpnIssuer = makeVpnGrantIssuer(node, subscription_mutex);
+    CROW_ROUTE(app, "/vpn/access-grant").methods("POST"_method)([vpnIssuer](const crow::request& req) {
+        VpnGrantIssuer::Result result { 503, { { "error", "issuer_unavailable" } } };
+        if (req.body.size() > 65536) {
+            result = { 413, { { "error", "request_too_large" } } };
+        } else if (vpnIssuer) {
+            try {
+                const auto document = QJsonDocument::fromJson(QByteArray::fromStdString(req.body));
+                result = document.isObject()
+                    ? vpnIssuer->issue(document.object(), QDateTime::currentMSecsSinceEpoch())
+                    : VpnGrantIssuer::Result { 400, { { "error", "invalid_request" } } };
+            } catch (...) {
+                result = { 503, { { "error", "issuer_unavailable" } } };
+            }
+        }
+        crow::response response(result.status, QJsonDocument(result.body).toJson(QJsonDocument::Compact).toStdString());
+        response.add_header("Content-Type", "application/json");
+        response.add_header("Cache-Control", "no-store");
+        return response;
+    });
+#endif
     CROW_ROUTE(app, "/subscription_add").methods("POST"_method)([&](const crow::request& req) -> crow::response {
         try {
             auto json = crow::json::load(req.body);
@@ -503,7 +531,13 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
             SubscriptionRecord rec;
             rec.until_ms = until_ms;
-            if (json.has("plan")) rec.plan = static_cast<int>(json["plan"].i());
+            if (json.has("plan")) {
+                const auto plan = json["plan"].i();
+                if (plan < 0 || plan > 4) {
+                    return json_error(400, "invalid plan");
+                }
+                rec.plan = static_cast<int>(plan);
+            }
 
             auto owner_opt = load_mint_actor();
             if (!owner_opt.has_value()) return json_error(500, "failed to load owner actor");
@@ -516,8 +550,10 @@ void run_api(ExtraChainNode* node, const std::string& api_token) {
 
             std::lock_guard<std::mutex> lock(subscription_mutex);
 
-            node->dfs()->dictionary_set_value(owner_actor.id(), sub_row->file_id, actorIdStr,
-                                              subscription_to_json(rec), owner_actor.id());
+            if (!node->dfs()->dictionary_set_value(owner_actor.id(), sub_row->file_id, actor->to_string(),
+                    subscription_to_json(rec), owner_actor.id())) {
+                return json_error(503, "subscription write failed");
+            }
 
             eLog("[api] [POST] [subscription_add] [actor: {}] [until: {}] [plan: {}]",
                  actorIdStr, until_ms, rec.plan);

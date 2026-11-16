@@ -48,6 +48,15 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}" GIT_BRANCH="${GIT_BRANCH}")
 
 target_link_libraries(extrachain-console PRIVATE Qt6::Core Qt6::Network extrachain Crow::Crow asio::asio)
 
+option(EXTRACHAIN_VPN_ISSUER "Build the optional Raccoon VPN grant issuer" OFF)
+if(EXTRACHAIN_VPN_ISSUER)
+    set(RACCOON_CONTROL_DIR "${CMAKE_CURRENT_LIST_DIR}/../raccoon-core/control" CACHE PATH "Raccoon control library")
+    add_subdirectory("${RACCOON_CONTROL_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/vpn-control")
+    target_sources(extrachain-console PRIVATE sources/console/vpn_issuer_api.cpp headers/console/vpn_issuer_api.h)
+    target_compile_definitions(extrachain-console PRIVATE EXTRACHAIN_VPN_ISSUER)
+    target_link_libraries(extrachain-console PRIVATE raccoonVpnControl)
+endif()
+
 if(UNIX AND NOT APPLE) # LINUX
     target_link_libraries(extrachain-console PRIVATE stdc++exp backtrace)
 endif()
